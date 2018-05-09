@@ -1,2 +1,2 @@
 # git-rs
-Git CLI Server written in Rust
+Git CLI Server/Client for running Git CLI commands, written in Rust
