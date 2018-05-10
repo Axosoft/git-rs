@@ -1,4 +1,3 @@
-
 pub mod protocol {
     use semver::Version;
 
