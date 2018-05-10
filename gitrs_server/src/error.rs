@@ -22,7 +22,7 @@ pub mod protocol {
     pub enum Error {
         Deserialization(DeserializationError),
         TcpSend(TcpSendError),
-        TcpReceive(TcpReceiveError)
+        TcpReceive(TcpReceiveError),
     }
 
     pub mod serde_json {

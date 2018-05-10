@@ -44,7 +44,9 @@ pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::
         })
 }
 
-pub fn read1(transport: Transport) -> impl Future<Item=(protocol::InboundMessage, Transport), Error=error::protocol::Error> {
+pub fn read1(
+    transport: Transport,
+) -> impl Future<Item = (protocol::InboundMessage, Transport), Error = error::protocol::Error> {
     use error::protocol::{Error, TcpReceiveError};
 
     transport
@@ -53,8 +55,7 @@ pub fn read1(transport: Transport) -> impl Future<Item=(protocol::InboundMessage
         .and_then(|(response, transport)| {
             let response = response.unwrap();
             println!("received message; message={:?}", response);
-            deserialize(&response)
-                .map(|message| (message, transport))
+            deserialize(&response).map(|message| (message, transport))
         })
 }
 
