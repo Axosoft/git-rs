@@ -87,13 +87,13 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
     ).and_then(|transport| {
         println!("wrote hello message");
         transport
-            .take(1)
-            .collect()
+            .into_future()
             .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
     })
-        .and_then(|response| {
+        .and_then(|(response, transport)| {
+            let response = response.unwrap();
             println!("received message; message={:?}", response);
-            deserialize(&response[0])
+            deserialize(&response)
         })
         .map_err(|err| {
             println!("error; err={:?}", err);
