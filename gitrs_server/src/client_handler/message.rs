@@ -19,6 +19,7 @@ pub mod protocol {
     #[serde(tag = "type")]
     pub enum OutboundMessage {
         Hello { version: Version },
+        GladToMeetYou,
         Goodbye { error_code: Option<ErrorCode> },
     }
 }

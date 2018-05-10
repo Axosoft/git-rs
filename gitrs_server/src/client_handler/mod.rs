@@ -22,11 +22,11 @@ type Transport = length_delimited::Framed<TcpStream, Bytes>;
 
 pub fn send(
     transport: Transport,
-    message: &protocol::OutboundMessage,
+    message: protocol::OutboundMessage,
 ) -> impl Future<Item = Transport, Error = error::protocol::Error> {
     use error::protocol::{Error, TcpSendError};
 
-    let message = serde_json::to_string(message).unwrap();
+    let message = serde_json::to_string(&message).unwrap();
     let message = Bytes::from(message.clone().into_bytes());
     transport
         .send(message)
@@ -55,7 +55,10 @@ pub fn read1(
         .and_then(|(response, transport)| {
             let response = response.unwrap();
             println!("received message; message={:?}", response);
-            deserialize(&response).map(|message| (message, transport))
+            deserialize(&response).map(|message| {
+                println!("deserialized message; message={:?}", message);
+                (message, transport)
+            })
         })
 }
 
@@ -87,25 +90,44 @@ impl ClientHandler {
 }
 
 pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
-    use error::protocol::{Error, TcpReceiveError};
-
     let client_handler = ClientHandler::new(state);
     let transport = length_delimited::Framed::<_, Bytes>::new(socket);
     let connection = send(
         transport,
-        &protocol::OutboundMessage::Hello {
+        protocol::OutboundMessage::Hello {
             version: Version::new(0, 1, 0),
         },
     ).and_then(|transport| {
         println!("wrote hello message");
         read1(transport)
     })
+        .and_then(|(response, transport)| {
+            use error::protocol::{Error, InboundMessageError};
+
+            match response {
+                protocol::InboundMessage::Hello => Ok(transport),
+                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
+            }
+        })
+        .and_then(|transport| send(transport, protocol::OutboundMessage::GladToMeetYou))
+        .and_then(read1)
+        .and_then(|(response, transport)| {
+            use error::protocol::{Error, InboundMessageError};
+
+            match response {
+                protocol::InboundMessage::Goodbye => Ok(transport),
+                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
+            }
+        })
+        .and_then(|transport| {
+            send(
+                transport,
+                protocol::OutboundMessage::Goodbye { error_code: None },
+            )
+        })
+        .and_then(|_| Ok(()))
         .map_err(|err| {
             println!("error; err={:?}", err);
-        })
-        .and_then(|(response, transport)| {
-            println!("deserialized message; message={:?}", response);
-            Ok(())
         });
 
     tokio::spawn(connection);

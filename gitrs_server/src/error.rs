@@ -19,10 +19,16 @@ pub mod protocol {
     }
 
     #[derive(Debug)]
+    pub enum InboundMessageError {
+        Unexpected,
+    }
+
+    #[derive(Debug)]
     pub enum Error {
         Deserialization(DeserializationError),
-        TcpSend(TcpSendError),
+        InboundMessage(InboundMessageError),
         TcpReceive(TcpReceiveError),
+        TcpSend(TcpSendError),
     }
 
     pub mod serde_json {
