@@ -44,16 +44,29 @@ pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::
         })
 }
 
+pub fn read1(transport: Transport) -> impl Future<Item=(protocol::InboundMessage, Transport), Error=error::protocol::Error> {
+    use error::protocol::{Error, TcpReceiveError};
+
+    transport
+        .into_future()
+        .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
+        .and_then(|(response, transport)| {
+            let response = response.unwrap();
+            println!("received message; message={:?}", response);
+            deserialize(&response)
+                .map(|message| (message, transport))
+        })
+}
+
 struct ClientHandler {
     channel_receiver: Receiver<channel::Message>,
     channel_sender: Sender<channel::Message>,
     state: Arc<Mutex<SharedState>>,
-    transport: Transport,
     uuid: Uuid,
 }
 
 impl ClientHandler {
-    fn new(state: Arc<Mutex<SharedState>>, transport: Transport) -> Self {
+    fn new(state: Arc<Mutex<SharedState>>) -> Self {
         let uuid = Uuid::new_v4();
         let (sender, receiver) = channel();
 
@@ -67,7 +80,6 @@ impl ClientHandler {
             channel_receiver: receiver,
             channel_sender: sender,
             state,
-            transport,
             uuid,
         }
     }
@@ -76,29 +88,21 @@ impl ClientHandler {
 pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
     use error::protocol::{Error, TcpReceiveError};
 
+    let client_handler = ClientHandler::new(state);
     let transport = length_delimited::Framed::<_, Bytes>::new(socket);
-    let client_handler = ClientHandler::new(state, transport);
-
     let connection = send(
-        client_handler.transport,
+        transport,
         &protocol::OutboundMessage::Hello {
             version: Version::new(0, 1, 0),
         },
     ).and_then(|transport| {
         println!("wrote hello message");
-        transport
-            .into_future()
-            .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
+        read1(transport)
     })
-        .and_then(|(response, transport)| {
-            let response = response.unwrap();
-            println!("received message; message={:?}", response);
-            deserialize(&response)
-        })
         .map_err(|err| {
             println!("error; err={:?}", err);
         })
-        .and_then(|response| {
+        .and_then(|(response, transport)| {
             println!("deserialized message; message={:?}", response);
             Ok(())
         });
