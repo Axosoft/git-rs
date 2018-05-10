@@ -1,21 +1,21 @@
 pub mod protocol {
     use semver::Version;
 
-    #[derive(Serialize)]
+    #[derive(Debug, Serialize)]
     #[serde(tag = "type", content = "message")]
     pub enum ErrorCode {
         Ok,
         BadRequest(String),
     }
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     #[serde(tag = "type")]
     pub enum InboundMessage {
         Hello,
         Goodbye,
     }
 
-    #[derive(Serialize)]
+    #[derive(Debug, Serialize)]
     #[serde(tag = "type")]
     pub enum OutboundMessage {
         Hello { version: Version },

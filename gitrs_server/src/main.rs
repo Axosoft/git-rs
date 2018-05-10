@@ -1,23 +1,22 @@
-#[macro_use]
+extern crate bytes;
 extern crate futures;
-#[macro_use]
 extern crate semver;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tokio;
+extern crate tokio_io;
 extern crate uuid;
 
 mod client_handler;
+mod error;
 
 use client_handler::handle_client;
 use client_handler::message::channel;
 use futures::sync::mpsc::UnboundedSender as Sender;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tokio::io;
 use tokio::net::TcpListener;
 use tokio::prelude::*;
 use uuid::Uuid;
