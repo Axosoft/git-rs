@@ -8,7 +8,7 @@ use error;
 use futures::future::Future;
 use futures::sync::mpsc::{unbounded as channel, UnboundedReceiver as Receiver,
                           UnboundedSender as Sender};
-use futures::{future, Sink, Stream};
+use futures::{Sink, Stream};
 use semver::Version;
 use serde_json;
 use std::str::from_utf8;
@@ -30,7 +30,7 @@ pub fn send(
     let message = Bytes::from(message.clone().into_bytes());
     transport
         .send(message)
-        .map_err(|err| Error::TcpSend(TcpSendError::Io))
+        .map_err(|_| Error::TcpSend(TcpSendError::Io))
 }
 
 pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::protocol::Error> {
@@ -90,7 +90,7 @@ impl ClientHandler {
 }
 
 pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
-    let client_handler = ClientHandler::new(state);
+    let _client_handler = ClientHandler::new(state);
     let transport = length_delimited::Framed::<_, Bytes>::new(socket);
     let connection = send(
         transport,

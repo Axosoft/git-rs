@@ -4,7 +4,6 @@ pub mod protocol {
     #[derive(Debug, Serialize)]
     #[serde(tag = "type", content = "message")]
     pub enum ErrorCode {
-        Ok,
         BadRequest(String),
     }
 
