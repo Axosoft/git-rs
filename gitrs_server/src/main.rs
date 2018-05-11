@@ -34,8 +34,11 @@ impl SharedState {
 
 pub fn main() {
     let state = Arc::new(Mutex::new(SharedState::new()));
-    let server_address = String::from("0.0.0.0:5134").parse().unwrap();
-    let listener = TcpListener::bind(&server_address).unwrap();
+    let server_address = String::from("0.0.0.0:5134")
+        .parse()
+        .expect("Server address could not be parsed!");
+    let listener =
+        TcpListener::bind(&server_address).expect("TCP listener could not be bound to address!");
     let server = listener
         .incoming()
         .for_each(move |socket| {
@@ -43,9 +46,7 @@ pub fn main() {
             handle_client(state.clone(), socket);
             Ok(())
         })
-        .map_err(|err| {
-            eprintln!("accept error = {:?}", err);
-        });
+        .map_err(|err| eprintln!("accept error = {:?}", err));
 
     println!("server running on {}", server_address);
     tokio::run(server);

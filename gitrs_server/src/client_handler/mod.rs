@@ -21,14 +21,15 @@ use uuid::Uuid;
 type Transport = length_delimited::Framed<TcpStream, Bytes>;
 
 #[allow(needless_pass_by_value)]
-pub fn send(
+pub fn send_message(
     transport: Transport,
     message: protocol::OutboundMessage,
 ) -> impl Future<Item = Transport, Error = error::protocol::Error> {
     use error::protocol::{Error, TcpSendError};
 
-    let message = serde_json::to_string(&message).unwrap();
-    let message = Bytes::from(message.clone().into_bytes());
+    let message = serde_json::to_string(&message)
+        .expect(&format!("Could not serialize message: {:?}", message));
+    let message = Bytes::from(message.into_bytes());
     transport
         .send(message)
         .map_err(|_| Error::TcpSend(TcpSendError::Io))
@@ -45,7 +46,7 @@ pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::
         })
 }
 
-pub fn read1(
+pub fn read_message(
     transport: Transport,
 ) -> impl Future<Item = (protocol::InboundMessage, Transport), Error = error::protocol::Error> {
     use error::protocol::{Error, TcpReceiveError};
@@ -54,7 +55,10 @@ pub fn read1(
         .into_future()
         .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
         .and_then(|(response, transport)| {
-            let response = response.unwrap();
+            let response = match response {
+                Some(x) => x,
+                None => unreachable!(),
+            };
             println!("received message; message={:?}", response);
             deserialize(&response).map(|message| {
                 println!("deserialized message; message={:?}", message);
@@ -77,7 +81,7 @@ impl ClientHandler {
 
         state
             .lock()
-            .unwrap()
+            .expect("Could not lock the shared state!")
             .channel_by_id
             .insert(uuid, sender.clone());
 
@@ -92,15 +96,15 @@ impl ClientHandler {
 
 pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
     let _client_handler = ClientHandler::new(state);
-    let transport = length_delimited::Framed::<_, Bytes>::new(socket);
-    let connection = send(
+    let transport = Transport::new(socket);
+    let connection = send_message(
         transport,
         protocol::OutboundMessage::Hello {
             version: Version::new(0, 1, 0),
         },
     ).and_then(|transport| {
         println!("wrote hello message");
-        read1(transport)
+        read_message(transport)
     })
         .and_then(|(response, transport)| {
             use error::protocol::{Error, InboundMessageError};
@@ -110,8 +114,8 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
                 _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
             }
         })
-        .and_then(|transport| send(transport, protocol::OutboundMessage::GladToMeetYou))
-        .and_then(read1)
+        .and_then(|transport| send_message(transport, protocol::OutboundMessage::GladToMeetYou))
+        .and_then(read_message)
         .and_then(|(response, transport)| {
             use error::protocol::{Error, InboundMessageError};
 
@@ -121,15 +125,13 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
             }
         })
         .and_then(|transport| {
-            send(
+            send_message(
                 transport,
                 protocol::OutboundMessage::Goodbye { error_code: None },
             )
         })
         .and_then(|_| Ok(()))
-        .map_err(|err| {
-            println!("error; err={:?}", err);
-        });
+        .map_err(|err| println!("error; err={:?}", err));
 
     tokio::spawn(connection);
 }
