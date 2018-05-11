@@ -20,6 +20,7 @@ use uuid::Uuid;
 
 type Transport = length_delimited::Framed<TcpStream, Bytes>;
 
+#[allow(needless_pass_by_value)]
 pub fn send(
     transport: Transport,
     message: protocol::OutboundMessage,
@@ -40,7 +41,7 @@ pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::
         .map_err(|_| Error::Deserialization(DeserializationError::Encoding))
         .and_then(|message| {
             serde_json::from_str(&message)
-                .map_err(|serde_err| error::protocol::serde_json::to_error(serde_err))
+                .map_err(|serde_err| error::protocol::serde_json::to_error(&serde_err))
         })
 }
 

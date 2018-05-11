@@ -34,7 +34,7 @@ pub mod protocol {
     pub mod serde_json {
         use super::{DeserializationError, Error};
 
-        pub fn to_error(error: ::serde_json::error::Error) -> Error {
+        pub fn to_error(error: &::serde_json::error::Error) -> Error {
             use serde_json::error::Category;
 
             Error::Deserialization(match error.classify() {

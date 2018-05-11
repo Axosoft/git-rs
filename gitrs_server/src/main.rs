@@ -21,15 +21,14 @@ use tokio::net::TcpListener;
 use tokio::prelude::*;
 use uuid::Uuid;
 
+#[derive(Default)]
 pub struct SharedState {
     channel_by_id: HashMap<Uuid, Sender<channel::Message>>,
 }
 
 impl SharedState {
     pub fn new() -> Self {
-        SharedState {
-            channel_by_id: HashMap::new(),
-        }
+        Default::default()
     }
 }
 
