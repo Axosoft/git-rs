@@ -14,6 +14,19 @@ use tokio;
 use tokio::net::TcpStream;
 use uuid::Uuid;
 
+macro_rules! read_validated_message {
+    ($messagePattern:pat, $transport:expr) => {
+        read_message($transport).and_then(|(response, transport)| {
+            use error::protocol::{Error, InboundMessageError};
+
+            match response {
+                $messagePattern => Ok((response, transport)),
+                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
+            }
+        })
+    };
+}
+
 struct ClientHandler {
     channel_receiver: Receiver<channel::Message>,
     channel_sender: Sender<channel::Message>,
@@ -51,27 +64,13 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
         },
     ).and_then(|transport| {
         println!("wrote hello message");
-        read_message(transport)
+        read_validated_message!(protocol::InboundMessage::Hello, transport)
     })
-        .and_then(|(response, transport)| {
-            use error::protocol::{Error, InboundMessageError};
-
-            match response {
-                protocol::InboundMessage::Hello => Ok(transport),
-                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
-            }
+        .and_then(|(_, transport)| {
+            send_message(transport, protocol::OutboundMessage::GladToMeetYou)
         })
-        .and_then(|transport| send_message(transport, protocol::OutboundMessage::GladToMeetYou))
-        .and_then(read_message)
-        .and_then(|(response, transport)| {
-            use error::protocol::{Error, InboundMessageError};
-
-            match response {
-                protocol::InboundMessage::Goodbye => Ok(transport),
-                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
-            }
-        })
-        .and_then(|transport| {
+        .and_then(|transport| read_validated_message!(protocol::InboundMessage::Goodbye, transport))
+        .and_then(|(_, transport)| {
             send_message(
                 transport,
                 protocol::OutboundMessage::Goodbye { error_code: None },
