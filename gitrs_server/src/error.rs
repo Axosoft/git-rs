@@ -1,4 +1,6 @@
 pub mod protocol {
+    use std::str;
+
     #[derive(Debug)]
     pub enum DeserializationError {
         Io,
@@ -31,10 +33,14 @@ pub mod protocol {
         TcpSend(TcpSendError),
     }
 
-    pub mod serde_json {
-        use super::{DeserializationError, Error};
+    impl From<str::Utf8Error> for Error {
+        fn from(_error: str::Utf8Error) -> Self {
+            Error::Deserialization(DeserializationError::Encoding)
+        }
+    }
 
-        pub fn to_error(error: &::serde_json::error::Error) -> Error {
+    impl From<::serde_json::error::Error> for Error {
+        fn from(error: ::serde_json::error::Error) -> Self {
             use serde_json::error::Category;
 
             Error::Deserialization(match error.classify() {

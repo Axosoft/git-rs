@@ -30,20 +30,18 @@ pub fn send_message(
     let message = serde_json::to_string(&message)
         .expect(&format!("Could not serialize message: {:?}", message));
     let message = Bytes::from(message.into_bytes());
+
     transport
         .send(message)
         .map_err(|_| Error::TcpSend(TcpSendError::Io))
 }
 
 pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::protocol::Error> {
-    use error::protocol::{DeserializationError, Error};
+    use error::protocol::Error;
 
     from_utf8(&bytes)
-        .map_err(|_| Error::Deserialization(DeserializationError::Encoding))
-        .and_then(|message| {
-            serde_json::from_str(&message)
-                .map_err(|serde_err| error::protocol::serde_json::to_error(&serde_err))
-        })
+        .map_err(Error::from)
+        .and_then(|message| serde_json::from_str(&message).map_err(Error::from))
 }
 
 pub fn read_message(
