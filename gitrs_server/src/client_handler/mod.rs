@@ -1,13 +1,12 @@
+mod channel;
 pub mod message;
 mod transport;
 
-use self::message::channel;
+use self::channel::Channel;
 use self::message::protocol;
 use self::transport::{read_message, send_message, Transport};
 use SharedState;
 use futures::future::Future;
-use futures::sync::mpsc::{unbounded as channel, UnboundedReceiver as Receiver,
-                          UnboundedSender as Sender};
 use semver::Version;
 use std::sync::{Arc, Mutex};
 use tokio;
@@ -28,8 +27,7 @@ macro_rules! read_validated_message {
 }
 
 struct ClientHandler {
-    channel_receiver: Receiver<channel::Message>,
-    channel_sender: Sender<channel::Message>,
+    channel: Channel,
     state: Arc<Mutex<SharedState>>,
     uuid: Uuid,
 }
@@ -37,17 +35,16 @@ struct ClientHandler {
 impl ClientHandler {
     fn new(state: Arc<Mutex<SharedState>>) -> Self {
         let uuid = Uuid::new_v4();
-        let (sender, receiver) = channel();
+        let channel = Channel::new();
 
         state
             .lock()
             .expect("Could not lock the shared state!")
             .channel_by_id
-            .insert(uuid, sender.clone());
+            .insert(uuid, channel.sender.clone());
 
         ClientHandler {
-            channel_receiver: receiver,
-            channel_sender: sender,
+            channel,
             state,
             uuid,
         }
