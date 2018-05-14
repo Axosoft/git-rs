@@ -24,9 +24,7 @@ pub mod protocol {
         Goodbye { error_code: Option<ErrorCode> },
     }
 
-    pub fn deserialize(
-        bytes: &::bytes::BytesMut,
-    ) -> Result<InboundMessage, Error> {
+    pub fn deserialize(bytes: &::bytes::BytesMut) -> Result<InboundMessage, Error> {
         use std::str::from_utf8;
 
         from_utf8(&bytes)

@@ -6,7 +6,8 @@ use self::channel::Channel;
 use self::message::protocol;
 use self::transport::{read_message, send_message, Transport};
 use SharedState;
-use futures::future::Future;
+use futures::future;
+use futures::future::{loop_fn, Future, Loop};
 use semver::Version;
 use std::sync::{Arc, Mutex};
 use tokio;
@@ -66,8 +67,20 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
         .and_then(|(_, transport)| {
             send_message(transport, protocol::OutboundMessage::GladToMeetYou)
         })
-        .and_then(|transport| read_validated_message!(protocol::InboundMessage::Goodbye, transport))
-        .and_then(|(_, transport)| {
+        .and_then(|transport| {
+            loop_fn(transport, |transport| {
+                read_message(transport).and_then(|(response, transport)| {
+                    if let protocol::InboundMessage::Goodbye = response {
+                        future::ok(Loop::Break(transport))
+                    } else {
+                        // command router
+                        // .and_then
+                        future::ok(Loop::Continue(transport))
+                    }
+                })
+            })
+        })
+        .and_then(|transport| {
             send_message(
                 transport,
                 protocol::OutboundMessage::Goodbye { error_code: None },
