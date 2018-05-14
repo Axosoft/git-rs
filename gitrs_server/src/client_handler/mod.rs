@@ -1,69 +1,18 @@
 pub mod message;
+mod transport;
 
 use self::message::channel;
 use self::message::protocol;
+use self::transport::{read_message, send_message, Transport};
 use SharedState;
-use bytes::{Bytes, BytesMut};
-use error;
 use futures::future::Future;
 use futures::sync::mpsc::{unbounded as channel, UnboundedReceiver as Receiver,
                           UnboundedSender as Sender};
-use futures::{Sink, Stream};
 use semver::Version;
-use serde_json;
-use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
 use tokio;
 use tokio::net::TcpStream;
-use tokio_io::codec::length_delimited;
 use uuid::Uuid;
-
-type Transport = length_delimited::Framed<TcpStream, Bytes>;
-
-#[allow(needless_pass_by_value)]
-pub fn send_message(
-    transport: Transport,
-    message: protocol::OutboundMessage,
-) -> impl Future<Item = Transport, Error = error::protocol::Error> {
-    use error::protocol::{Error, TcpSendError};
-
-    let message = serde_json::to_string(&message)
-        .expect(&format!("Could not serialize message: {:?}", message));
-    let message = Bytes::from(message.into_bytes());
-
-    transport
-        .send(message)
-        .map_err(|_| Error::TcpSend(TcpSendError::Io))
-}
-
-pub fn deserialize(bytes: &BytesMut) -> Result<protocol::InboundMessage, error::protocol::Error> {
-    use error::protocol::Error;
-
-    from_utf8(&bytes)
-        .map_err(Error::from)
-        .and_then(|message| serde_json::from_str(&message).map_err(Error::from))
-}
-
-pub fn read_message(
-    transport: Transport,
-) -> impl Future<Item = (protocol::InboundMessage, Transport), Error = error::protocol::Error> {
-    use error::protocol::{Error, TcpReceiveError};
-
-    transport
-        .into_future()
-        .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
-        .and_then(|(response, transport)| {
-            let response = match response {
-                Some(x) => x,
-                None => unreachable!(),
-            };
-            println!("received message; message={:?}", response);
-            deserialize(&response).map(|message| {
-                println!("deserialized message; message={:?}", message);
-                (message, transport)
-            })
-        })
-}
 
 struct ClientHandler {
     channel_receiver: Receiver<channel::Message>,
