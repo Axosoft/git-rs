@@ -14,6 +14,7 @@ pub mod protocol {
     pub enum InboundMessage {
         Hello,
         Goodbye,
+        RunGitCommand,
     }
 
     #[derive(Debug, Serialize)]

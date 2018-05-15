@@ -70,13 +70,23 @@ pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
         .and_then(|transport| {
             loop_fn(transport, |transport| {
                 read_message(transport).and_then(|(response, transport)| {
-                    if let protocol::InboundMessage::Goodbye = response {
-                        future::ok(Loop::Break(transport))
-                    } else {
-                        // command router
-                        // .and_then
-                        future::ok(Loop::Continue(transport))
-                    }
+                    let (cmd_future, continue_looping) = match response {
+                        protocol::InboundMessage::Goodbye => {
+                            (Box::new(future::ok(transport)), false)
+                        }
+                        protocol::InboundMessage::RunGitCommand => {
+                            (Box::new(future::ok(transport)), true)
+                        }
+                        _ => (Box::new(future::ok(transport)), true),
+                    };
+
+                    Box::new(cmd_future.and_then(move |transport| {
+                        if continue_looping {
+                            Ok(Loop::Continue(transport))
+                        } else {
+                            Ok(Loop::Break(transport))
+                        }
+                    }))
                 })
             })
         })
