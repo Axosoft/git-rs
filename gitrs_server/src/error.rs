@@ -32,9 +32,15 @@ pub mod protocol {
     }
 
     #[derive(Debug)]
+    pub enum ProcessError {
+        Failed
+    }
+
+    #[derive(Debug)]
     pub enum Error {
         Deserialization(DeserializationError),
         InboundMessage(InboundMessageError),
+        Process(ProcessError),
         TcpReceive(TcpReceiveError),
         TcpSend(TcpSendError),
     }

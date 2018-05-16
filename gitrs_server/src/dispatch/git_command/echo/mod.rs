@@ -1,28 +1,29 @@
 mod message;
 
 use self::message as internal_echo_message;
-use message::protocol::git_command::echo as shared_echo_message;
-use util::transport::{send_message, Transport};
 
 use error;
 use futures::Future;
+use message::protocol::git_command::echo as shared_echo_message;
 use std::process::Command;
-use tokio_core::reactor::Core;
+use std::str;
 use tokio_process::CommandExt;
+use types::DispatchFuture;
+use util::transport::{send_message, Transport};
 
-pub fn dispatch_echo_command(transport: Transport, message: shared_echo_message::Inbound) -> () {
-    // impl Future<Item = (internal_echo_message::Outbound, Transport), Error = error::protocol::Error> {
-    unimplemented!()
-    // use error::protocol::{Error, TcpReceiveError};
+pub fn dispatch_echo_command(
+    transport: Transport,
+    message: shared_echo_message::Inbound,
+) -> DispatchFuture {
+    use error::protocol::{Error, ProcessError::Failed};
 
-    // let mut core = Core::new().unwrap();
-
-    // let output = Command::new("echo").arg("hello").arg("world")
-    //                     .output_async(&core.handle());
-
-    // let message =
-    // serialize(&message).expect(&format!("Could not serialize message: {:?}", message));
-
-    // transport
-    //     .send(message)
+    Box::new(
+        Command::new("echo").arg(&message.input)
+            .output_async()
+            .map_err(|_| Error::Process(Failed))
+            .map(|output| {
+                println!("{}", str::from_utf8(&output.stdout).unwrap());
+                transport
+            })
+    )
 }
