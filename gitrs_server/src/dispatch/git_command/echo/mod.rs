@@ -10,7 +10,7 @@ use tokio_process::CommandExt;
 use types::DispatchFuture;
 use util::transport::{send_message, Transport};
 
-pub fn dispatch_echo_command(
+pub fn dispatch(
     transport: Transport,
     message: shared_echo_message::Inbound,
 ) -> DispatchFuture {
