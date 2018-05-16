@@ -1,6 +1,12 @@
 pub mod protocol {
     use std::str;
 
+    #[derive(Debug, Serialize)]
+    #[serde(tag = "type", content = "message")]
+    pub enum ErrorCode {
+        BadRequest(String),
+    }
+
     #[derive(Debug)]
     pub enum DeserializationError {
         Io,

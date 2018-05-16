@@ -6,15 +6,19 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tokio;
+extern crate tokio_core;
 extern crate tokio_io;
+extern crate tokio_process;
 extern crate uuid;
 
 mod client_handler;
 mod error;
+mod message;
+mod util;
 
 use client_handler::handle_client;
-use client_handler::message::channel;
 use futures::sync::mpsc::UnboundedSender as Sender;
+use message::channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;

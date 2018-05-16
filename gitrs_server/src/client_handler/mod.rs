@@ -1,11 +1,12 @@
-mod channel;
-pub mod message;
-mod transport;
+mod git_command;
 
-use self::channel::Channel;
-use self::message::protocol;
-use self::transport::{read_message, send_message, Transport};
-use SharedState;
+use message;
+use util::channel::Channel;
+use util::transport::{read_message, send_message, Transport};
+
+use self::git_command::dispatch_git_command;
+use super::SharedState;
+
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
 use semver::Version;
@@ -52,50 +53,52 @@ impl ClientHandler {
     }
 }
 
+// TODO Move
+type DispatchFuture = Box<Future<Item = Transport, Error = ::error::protocol::Error> + Send>;
+
+// TODO Move
+pub fn dispatch(transport: Transport, message: message::protocol::Inbound) -> DispatchFuture {
+    use error::protocol::Error;
+    use error::protocol::InboundMessageError::Unexpected;
+    use message::protocol::Inbound;
+
+    match message {
+        Inbound::GitCommand(git_command) => dispatch_git_command(transport, git_command),
+        _ => Box::new(future::err(Error::InboundMessage(Unexpected))),
+    }
+}
+
 pub fn handle_client(state: Arc<Mutex<SharedState>>, socket: TcpStream) {
+    use message::protocol::{Inbound, Outbound};
     let _client_handler = ClientHandler::new(state);
     let transport = Transport::new(socket);
     let connection = send_message(
         transport,
-        protocol::OutboundMessage::Hello {
+        Outbound::Hello {
             version: Version::new(0, 1, 0),
         },
     ).and_then(|transport| {
         println!("wrote hello message");
-        read_validated_message!(protocol::InboundMessage::Hello, transport)
+        read_validated_message!(Inbound::Hello, transport)
     })
-        .and_then(|(_, transport)| {
-            send_message(transport, protocol::OutboundMessage::GladToMeetYou)
-        })
+        .and_then(|(_, transport)| send_message(transport, Outbound::GladToMeetYou))
         .and_then(|transport| {
             loop_fn(transport, |transport| {
-                read_message(transport).and_then(|(response, transport)| {
-                    let (cmd_future, continue_looping) = match response {
-                        protocol::InboundMessage::Goodbye => {
-                            (Box::new(future::ok(transport)), false)
-                        }
-                        protocol::InboundMessage::RunGitCommand => {
-                            (Box::new(future::ok(transport)), true)
-                        }
-                        _ => (Box::new(future::ok(transport)), true),
-                    };
-
-                    Box::new(cmd_future.and_then(move |transport| {
-                        if continue_looping {
-                            Ok(Loop::Continue(transport))
+                read_message(transport).and_then(
+                    |(response, transport)| -> Box<
+                        Future<Item = Loop<Transport, Transport>, Error = ::error::protocol::Error>
+                            + Send,
+                    > {
+                        if let Inbound::Goodbye = response {
+                            Box::new(future::ok(Loop::Break(transport)))
                         } else {
-                            Ok(Loop::Break(transport))
+                            Box::new(dispatch(transport, response).map(Loop::Continue))
                         }
-                    }))
-                })
+                    },
+                )
             })
         })
-        .and_then(|transport| {
-            send_message(
-                transport,
-                protocol::OutboundMessage::Goodbye { error_code: None },
-            )
-        })
+        .and_then(|transport| send_message(transport, Outbound::Goodbye { error_code: None }))
         .and_then(|_| Ok(()))
         .map_err(|err| println!("error; err={:?}", err));
 
