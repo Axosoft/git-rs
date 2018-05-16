@@ -1,7 +1,3 @@
-mod message;
-
-use self::message as internal_echo_message;
-
 use futures::{future, Future};
 use message::protocol::git_command::echo as shared_echo_message;
 use std::process::Command;
@@ -10,10 +6,13 @@ use tokio_process::CommandExt;
 use types::DispatchFuture;
 use util::transport::{send_message, Transport};
 
-pub fn dispatch(
-    transport: Transport,
-    message: shared_echo_message::Inbound,
-) -> DispatchFuture {
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum Outbound {
+    Result { output: String },
+}
+
+pub fn dispatch(transport: Transport, message: shared_echo_message::Inbound) -> DispatchFuture {
     use error::protocol::{Error, ProcessError::{Encoding, Failed}};
 
     Box::new(
@@ -25,11 +24,6 @@ pub fn dispatch(
                 Ok(output) => future::ok(String::from(output)),
                 Err(_) => future::err(Error::Process(Encoding)),
             })
-            .and_then(|output| {
-                send_message(
-                    transport,
-                    internal_echo_message::Outbound::Result { output },
-                )
-            }),
+            .and_then(|output| send_message(transport, Outbound::Result { output })),
     )
 }
