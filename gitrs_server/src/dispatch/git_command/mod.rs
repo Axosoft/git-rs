@@ -1,4 +1,3 @@
-mod echo;
 mod open_repo;
 mod status;
 
@@ -13,7 +12,6 @@ pub fn dispatch(
     use self::git_command::Inbound;
 
     match message {
-        Inbound::Echo { input } => echo::dispatch(connection_state, input),
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
         Inbound::Status => status::dispatch(connection_state),
     }
