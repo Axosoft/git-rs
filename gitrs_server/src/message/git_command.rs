@@ -3,5 +3,6 @@ pub mod protocol {
     pub enum Inbound {
         Echo { input: String },
         OpenRepo { path: String },
+        Status,
     }
 }

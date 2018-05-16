@@ -1,5 +1,6 @@
 mod echo;
 mod open_repo;
+mod status;
 
 use message::protocol::git_command;
 use state;
@@ -14,5 +15,6 @@ pub fn dispatch(
     match message {
         Inbound::Echo { input } => echo::dispatch(connection_state, input),
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
+        Inbound::Status => status::dispatch(connection_state),
     }
 }

@@ -28,7 +28,7 @@ pub fn dispatch(mut connection_state: state::Connection, workdir_path: String) -
         match repo_path.metadata() {
             Ok(metadata) => {
                 if metadata.is_dir() {
-                    connection_state.repo_path = workdir_path;
+                    connection_state.repo_path = Some(workdir_path);
                     send_message(connection_state, OutboundMessage::Success)
                 } else {
                     send_message(connection_state, OutboundMessage::Error(IsNotRepo))
