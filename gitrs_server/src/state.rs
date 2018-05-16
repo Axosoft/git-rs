@@ -3,6 +3,7 @@ use message::channel;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use util::channel::Channel;
+use util::transport::Transport;
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -19,11 +20,12 @@ impl Shared {
 pub struct Connection {
     channel: Channel,
     state: Arc<Mutex<Shared>>,
+    pub transport: Option<Transport>,
     uuid: Uuid,
 }
 
 impl Connection {
-    pub fn new(state: Arc<Mutex<Shared>>) -> Self {
+    pub fn new(state: Arc<Mutex<Shared>>, transport: Transport) -> Self {
         let uuid = Uuid::new_v4();
         let channel = Channel::new();
 
@@ -36,6 +38,7 @@ impl Connection {
         Connection {
             channel,
             state,
+            transport: Some(transport),
             uuid,
         }
     }

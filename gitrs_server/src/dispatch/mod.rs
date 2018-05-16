@@ -13,12 +13,12 @@ use tokio::net::TcpStream;
 use util::transport::{read_message, send_message, Transport};
 
 macro_rules! read_validated_message {
-    ($messagePattern:pat, $transport:expr) => {
-        read_message($transport).and_then(|(response, transport)| {
+    ($messagePattern:pat, $connection_state:expr) => {
+        read_message($connection_state).and_then(|(response, connection_state)| {
             use error::protocol::{Error, InboundMessageError};
 
             match response {
-                $messagePattern => Ok((response, transport)),
+                $messagePattern => Ok((response, connection_state)),
                 _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
             }
         })
@@ -27,30 +27,33 @@ macro_rules! read_validated_message {
 
 pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
     use message::protocol::{Inbound, Outbound};
-    let connection_state = state::Connection::new(state);
     let transport = Transport::new(socket);
+    let connection_state = state::Connection::new(state, transport);
 
     let connection = send_message(
-        transport,
+        connection_state,
         Outbound::Hello {
             version: Version::new(0, 1, 0),
         },
-    ).and_then(|transport| {
+    ).and_then(|connection_state| {
         println!("wrote hello message");
-        read_validated_message!(Inbound::Hello, transport)
+        read_validated_message!(Inbound::Hello, connection_state)
     })
-        .and_then(|(_, transport)| send_message(transport, Outbound::GladToMeetYou))
-        .and_then(|transport| {
-            loop_fn(transport, |transport| {
-                read_message(transport).and_then(
-                    |(response, transport)| -> Box<
-                        Future<Item = Loop<Transport, Transport>, Error = ::error::protocol::Error>
+        .and_then(|(_, connection_state)| send_message(connection_state, Outbound::GladToMeetYou))
+        .and_then(|connection_state| {
+            loop_fn(connection_state, |connection_state| {
+                read_message(connection_state).and_then(
+                    |(response, connection_state)| -> Box<
+                        Future<
+                                Item = Loop<state::Connection, state::Connection>,
+                                Error = ::error::protocol::Error,
+                            >
                             + Send,
                     > {
                         if let Inbound::Goodbye = response {
-                            Box::new(future::ok(Loop::Break(transport)))
+                            Box::new(future::ok(Loop::Break(connection_state)))
                         } else {
-                            Box::new(dispatch(transport, response).map(Loop::Continue))
+                            Box::new(dispatch(connection_state, response).map(Loop::Continue))
                         }
                     },
                 )

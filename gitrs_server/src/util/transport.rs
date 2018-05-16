@@ -1,10 +1,11 @@
 use bytes::{Bytes, BytesMut};
 use error;
-use futures::future::Future;
+use futures::future::{self, Future};
 use futures::{Sink, Stream};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json;
+use state;
 use std::fmt::Debug;
 use std::str;
 use tokio::net::TcpStream;
@@ -30,43 +31,62 @@ where
 }
 
 pub fn read_message<T>(
-    transport: Transport,
-) -> impl Future<Item = (T, Transport), Error = error::protocol::Error>
+    mut connection_state: state::Connection,
+) -> impl Future<Item = (T, state::Connection), Error = error::protocol::Error>
 where
     T: DeserializeOwned + Debug,
 {
-    use error::protocol::{Error, TcpReceiveError};
+    use error::protocol::{Error, ProcessError, TcpReceiveError};
 
-    transport
-        .into_future()
-        .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
+    future::result(
+        connection_state
+            .transport
+            .take()
+            .ok_or(Error::Process(ProcessError::Failed)),
+    ).and_then(|transport| {
+        transport
+            .into_future()
+            .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
+    })
         .and_then(|(response, transport)| {
             let response = match response {
                 Some(x) => x,
-                None => unreachable!(),
+                None => unimplemented!(),
             };
             println!("received message; message={:?}", response);
             deserialize(response).map(|message| {
                 println!("deserialized message; message={:?}", message);
-                (message, transport)
+                connection_state.transport = Some(transport);
+                (message, connection_state)
             })
         })
 }
 
 #[allow(needless_pass_by_value)]
 pub fn send_message<T>(
-    transport: Transport,
+    mut connection_state: state::Connection,
     message: T,
-) -> impl Future<Item = Transport, Error = error::protocol::Error>
+) -> impl Future<Item = state::Connection, Error = error::protocol::Error>
 where
     T: Serialize + Debug,
 {
-    use error::protocol::{Error, TcpSendError};
+    use error::protocol::{Error, ProcessError, TcpSendError};
 
     let message =
         serialize(&message).expect(&format!("Could not serialize message: {:?}", message));
 
-    transport
-        .send(message)
-        .map_err(|_| Error::TcpSend(TcpSendError::Io))
+    future::result(
+        connection_state
+            .transport
+            .take()
+            .ok_or(Error::Process(ProcessError::Failed)),
+    ).and_then(|transport| {
+        transport
+            .send(message)
+            .map_err(|_| Error::TcpSend(TcpSendError::Io))
+    })
+        .map(|transport| {
+            connection_state.transport = Some(transport);
+            connection_state
+        })
 }

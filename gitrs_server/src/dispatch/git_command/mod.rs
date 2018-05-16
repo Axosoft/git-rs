@@ -1,15 +1,16 @@
 mod echo;
 
-use error;
-use futures::Future;
 use message::protocol::git_command;
+use state;
 use types::DispatchFuture;
-use util::transport::Transport;
 
-pub fn dispatch(transport: Transport, message: git_command::Inbound) -> DispatchFuture {
+pub fn dispatch(
+    connection_state: state::Connection,
+    message: git_command::Inbound,
+) -> DispatchFuture {
     use self::git_command::Inbound;
 
     match message {
-        Inbound::Echo(echo_command) => echo::dispatch(transport, echo_command),
+        Inbound::Echo(echo_command) => echo::dispatch(connection_state, echo_command),
     }
 }
