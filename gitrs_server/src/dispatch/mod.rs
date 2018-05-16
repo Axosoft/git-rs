@@ -6,11 +6,11 @@ use futures::future;
 use futures::future::{loop_fn, Future, Loop};
 use message;
 use semver::Version;
+use state;
 use std::sync::{Arc, Mutex};
 use tokio;
 use tokio::net::TcpStream;
 use util::transport::{read_message, send_message, Transport};
-use state;
 
 macro_rules! read_validated_message {
     ($messagePattern:pat, $transport:expr) => {

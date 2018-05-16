@@ -33,6 +33,7 @@ pub mod protocol {
 
     #[derive(Debug)]
     pub enum ProcessError {
+        Encoding,
         Failed,
     }
 
