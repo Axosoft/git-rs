@@ -12,7 +12,7 @@ pub fn dispatch(
     use self::git_command::Inbound;
 
     match message {
-        Inbound::Echo(echo_command) => echo::dispatch(connection_state, echo_command),
+        Inbound::Echo { input } => echo::dispatch(connection_state, input),
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
     }
 }
