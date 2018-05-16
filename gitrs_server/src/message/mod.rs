@@ -3,8 +3,8 @@ mod git_command;
 pub mod protocol {
     pub use super::git_command::protocol as git_command;
 
-    use semver::Version;
     use error::protocol::ErrorCode;
+    use semver::Version;
 
     #[derive(Debug, Deserialize)]
     #[serde(tag = "type")]

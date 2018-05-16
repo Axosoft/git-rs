@@ -1,6 +1,6 @@
+use super::git_command::dispatch_git_command;
 use error;
 use futures::future;
-use super::git_command::dispatch_git_command;
 use message;
 use types::DispatchFuture;
 use util::transport::{read_message, send_message, Transport};

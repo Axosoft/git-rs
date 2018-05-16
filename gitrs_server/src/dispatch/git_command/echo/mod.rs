@@ -18,12 +18,13 @@ pub fn dispatch_echo_command(
     use error::protocol::{Error, ProcessError::Failed};
 
     Box::new(
-        Command::new("echo").arg(&message.input)
+        Command::new("echo")
+            .arg(&message.input)
             .output_async()
             .map_err(|_| Error::Process(Failed))
             .map(|output| {
                 println!("{}", str::from_utf8(&output.stdout).unwrap());
                 transport
-            })
+            }),
     )
 }

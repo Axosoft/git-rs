@@ -33,7 +33,7 @@ pub mod protocol {
 
     #[derive(Debug)]
     pub enum ProcessError {
-        Failed
+        Failed,
     }
 
     #[derive(Debug)]
