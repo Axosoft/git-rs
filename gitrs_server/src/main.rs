@@ -11,12 +11,14 @@ extern crate tokio_io;
 extern crate tokio_process;
 extern crate uuid;
 
-mod client_handler;
+mod dispatch;
 mod error;
 mod message;
+mod state;
+mod types;
 mod util;
 
-use client_handler::handle_client;
+use dispatch::init_dispatch;
 use futures::sync::mpsc::UnboundedSender as Sender;
 use message::channel;
 use std::collections::HashMap;
@@ -25,19 +27,8 @@ use tokio::net::TcpListener;
 use tokio::prelude::*;
 use uuid::Uuid;
 
-#[derive(Default)]
-pub struct SharedState {
-    channel_by_id: HashMap<Uuid, Sender<channel::Message>>,
-}
-
-impl SharedState {
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
 pub fn main() {
-    let state = Arc::new(Mutex::new(SharedState::new()));
+    let state = Arc::new(Mutex::new(state::Shared::new()));
     let server_address = String::from("0.0.0.0:5134")
         .parse()
         .expect("Server address could not be parsed!");
@@ -47,7 +38,7 @@ pub fn main() {
         .incoming()
         .for_each(move |socket| {
             println!("accepted socket; addr={:?}", socket.peer_addr().unwrap());
-            handle_client(state.clone(), socket);
+            init_dispatch(state.clone(), socket);
             Ok(())
         })
         .map_err(|err| eprintln!("accept error = {:?}", err));

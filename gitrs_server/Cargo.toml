@@ -18,5 +18,5 @@ serde_json = "1.0"
 tokio = "0.1"
 tokio-core = "0.1"
 tokio-io = "0.1"
-tokio-process = { git = "https://github.com/ipetkov/tokio-process", branch = "newtokio" }
+tokio-process = { git = "https://github.com/alexcrichton/tokio-process", branch = "0.2.x" }
 uuid = { version = "0.6", features = ["v4"] }
