@@ -6,5 +6,6 @@ pub mod protocol {
     #[derive(Debug, Deserialize)]
     pub enum Inbound {
         Echo(echo::Inbound),
+        OpenRepo { path: String },
     }
 }

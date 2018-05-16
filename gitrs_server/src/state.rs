@@ -19,6 +19,7 @@ impl Shared {
 
 pub struct Connection {
     channel: Channel,
+    pub repo_path: String,
     state: Arc<Mutex<Shared>>,
     pub transport: Option<Transport>,
     uuid: Uuid,
@@ -37,6 +38,7 @@ impl Connection {
 
         Connection {
             channel,
+            repo_path: String::new(),
             state,
             transport: Some(transport),
             uuid,
