@@ -1,5 +1,4 @@
-use nom::{line_ending, rest, digit1, oct_digit1};
-use std::str;
+use nom::{digit1, oct_digit1};
 
 fn parse_num(input: &str, radix: u32) -> u32 {
     u32::from_str_radix(input, radix).unwrap()
@@ -13,7 +12,6 @@ pub enum Status {
     Renamed,
     Copied,
     Untracked,
-    Ignored,
 }
 
 named!(parse_status<&str, Option<Status>>,
@@ -221,7 +219,7 @@ named!(parse_ordinary_status_entry<&str, StatusEntry>,
         char!(' ') >>
         oids: parse_status_oids >>
         char!(' ') >>
-        path: take_until_and_consume!("\n") >>
+        path: take_until!("\n") >>
         (StatusEntry::OrdinaryStatusEntry(OrdinaryStatusEntry {
             staged_status,
             unstaged_status,
@@ -246,8 +244,9 @@ named!(parse_copied_or_renamed_status_entry<&str, StatusEntry>,
         char!(' ') >>
         score: parse_score >>
         char!(' ') >>
-        path: take_until_and_consume!("\t") >>
-        original_path: take_until_and_consume!("\n") >>
+        path: take_until!("\t") >>
+        char!('\t') >>
+        original_path: take_until!("\n") >>
         (StatusEntry::CopiedOrRenamedStatusEntry(CopiedOrRenamedStatusEntry {
             staged_status,
             unstaged_status,
@@ -272,7 +271,7 @@ named!(parse_unmerged_status_entry<&str, StatusEntry>,
         char!(' ') >>
         oids: parse_unmerged_status_oids >>
         char!(' ') >>
-        path: take_until_and_consume!("\n") >>
+        path: take_until!("\n") >>
         (StatusEntry::UnmergedStatusEntry(UnmergedStatusEntry {
             staged_status,
             unstaged_status,
@@ -287,14 +286,14 @@ named!(parse_unmerged_status_entry<&str, StatusEntry>,
 
 named!(parse_untracked_status_entry<&str, StatusEntry>,
     do_parse!(
-        path: take_until_and_consume!("\n") >>
+        path: take_until!("\n") >>
         (StatusEntry::UntrackedStatusEntry(UntrackedStatusEntry { path: path.to_string() }))
     )
 );
 
 named!(parse_ignored_status_entry<&str, StatusEntry>,
     do_parse!(
-        path: take_until_and_consume!("\n") >>
+        path: take_until!("\n") >>
         (StatusEntry::IgnoredStatusEntry(IgnoredStatusEntry { path: path.to_string() }))
     )
 );
@@ -305,13 +304,17 @@ named!(parse_status_entry<&str, StatusEntry>,
         "2 " => call!(parse_copied_or_renamed_status_entry) |
         "u " => call!(parse_unmerged_status_entry) |
         "! " => call!(parse_untracked_status_entry) |
-        "? " => complete!(call!(parse_ignored_status_entry))
+        "? " => call!(parse_ignored_status_entry)
     )
 );
 
 named!(pub parse_status_entries<&str, Vec<StatusEntry>>,
     do_parse!(
-        entries: many_till!(parse_status_entry, char!('\0')) >>
-        (entries.0)
+        entries: separated_list!(
+            char!('\n'),
+            complete!(parse_status_entry)
+        ) >>
+        char!('\n') >>
+        (entries)
     )
 );

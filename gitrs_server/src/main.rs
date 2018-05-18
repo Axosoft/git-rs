@@ -27,7 +27,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
-use uuid::Uuid;
 
 pub fn main() {
     let state = Arc::new(Mutex::new(state::Shared::new()));

@@ -41,11 +41,9 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                     Err(_) => future::err(Error::Process(Encoding)),
                 })
                 .and_then(|result| -> DispatchFuture {
-                    let mut result = String::from(result);
-                    result.push('\0'); // NOTE oh no :(
                     match parse_status_entries(&result) {
                         Ok((_, result)) => Box::new(send_message(connection_state, OutboundMessage::Success { result })),
-                        Err(err) => Box::new(future::err(Error::Process(Encoding))), // TODO Change me to something else please
+                        Err(_err) => Box::new(future::err(Error::Process(Encoding))), // TODO Change me to something else please
                     }
                 }),
         ),
