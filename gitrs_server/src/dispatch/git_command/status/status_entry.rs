@@ -299,8 +299,6 @@ named!(parse_ignored_status_entry<&str, StatusEntry>,
     )
 );
 
-pub fn is_empty(s: &str) -> bool { s.is_empty() }
-
 named!(parse_status_entry<&str, StatusEntry>,
     switch!(take!(2),
         "1 " => call!(parse_ordinary_status_entry) |
