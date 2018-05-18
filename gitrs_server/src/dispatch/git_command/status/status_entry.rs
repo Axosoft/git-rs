@@ -1,10 +1,11 @@
-use nom::{digit1, oct_digit1};
+use error::protocol::{Error, ProcessError::Parsing};
+use nom::{self, digit1, oct_digit1};
 
 fn parse_num(input: &str, radix: u32) -> u32 {
     u32::from_str_radix(input, radix).unwrap()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Status {
     Added,
     Modified,
@@ -12,24 +13,30 @@ pub enum Status {
     Renamed,
     Copied,
     Untracked,
+    Unmerged,
 }
 
 named!(parse_status<&str, Option<Status>>,
-    do_parse!(
-        status: switch!(take!(1),
-            "M" => value!(Some(Status::Modified)) |
-            "A" => value!(Some(Status::Added)) |
-            "D" => value!(Some(Status::Deleted)) |
-            "R" => value!(Some(Status::Renamed)) |
-            "C" => value!(Some(Status::Copied)) |
-            "?" => value!(Some(Status::Untracked)) |
-            "." => value!(None)
-        ) >>
-        (status)
+    switch!(take!(1),
+        "M" => value!(Some(Status::Modified)) |
+        "A" => value!(Some(Status::Added)) |
+        "D" => value!(Some(Status::Deleted)) |
+        "R" => value!(Some(Status::Renamed)) |
+        "C" => value!(Some(Status::Copied)) |
+        "?" => value!(Some(Status::Untracked)) |
+        "." => value!(None)
     )
 );
 
-#[derive(Debug, Serialize)]
+named!(parse_status_unmerged<&str, Status>,
+    switch!(take!(1),
+        "A" => value!(Status::Added) |
+        "D" => value!(Status::Deleted) |
+        "U" => value!(Status::Unmerged)
+    )
+);
+
+#[derive(Debug)]
 pub struct FileModeStatus {
     head: u32,
     index: u32,
@@ -51,7 +58,7 @@ named!(parse_file_mode<&str, FileModeStatus>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UnmergedFileModeStatus {
     stage_1: u32,
     stage_2: u32,
@@ -77,13 +84,13 @@ named!(parse_unmerged_file_mode<&str, UnmergedFileModeStatus>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum ScoreType {
     Renamed,
     Copied,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Score {
     score_type: ScoreType,
     percentage: u32,
@@ -97,7 +104,7 @@ named!(parse_score<&str, Score>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SubmoduleStatus {
     commit_changed: bool,
     has_tracked_changes: bool,
@@ -120,7 +127,7 @@ named!(parse_maybe_submodule_status<&str, Option<SubmoduleStatus>>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct StatusOids {
     head: String,
     index: String,
@@ -135,7 +142,7 @@ named!(parse_status_oids<&str, StatusOids>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UnmergedStatusOids {
     stage_1: String,
     stage_2: String,
@@ -157,7 +164,7 @@ named!(parse_unmerged_status_oids<&str, UnmergedStatusOids>,
     )
 );
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub enum StatusEntry {
     OrdinaryStatusEntry(OrdinaryStatusEntry),
     CopiedOrRenamedStatusEntry(CopiedOrRenamedStatusEntry),
@@ -166,7 +173,7 @@ pub enum StatusEntry {
     IgnoredStatusEntry(IgnoredStatusEntry),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct OrdinaryStatusEntry {
     staged_status: Option<Status>,
     unstaged_status: Option<Status>,
@@ -176,7 +183,7 @@ pub struct OrdinaryStatusEntry {
     path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct CopiedOrRenamedStatusEntry {
     staged_status: Option<Status>,
     unstaged_status: Option<Status>,
@@ -188,22 +195,22 @@ pub struct CopiedOrRenamedStatusEntry {
     original_path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UnmergedStatusEntry {
-    staged_status: Option<Status>,
-    unstaged_status: Option<Status>,
+    staged_status: Status,
+    unstaged_status: Status,
     submodule_status: Option<SubmoduleStatus>,
     file_mode: UnmergedFileModeStatus,
     oids: UnmergedStatusOids,
     path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UntrackedStatusEntry {
     path: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct IgnoredStatusEntry {
     path: String,
 }
@@ -262,8 +269,8 @@ named!(parse_copied_or_renamed_status_entry<&str, StatusEntry>,
 
 named!(parse_unmerged_status_entry<&str, StatusEntry>,
     do_parse!(
-        staged_status: parse_status >>
-        unstaged_status: parse_status >>
+        staged_status: parse_status_unmerged >>
+        unstaged_status: parse_status_unmerged >>
         char!(' ') >>
         submodule_status: parse_maybe_submodule_status >>
         char!(' ') >>
@@ -282,7 +289,6 @@ named!(parse_unmerged_status_entry<&str, StatusEntry>,
         }))
     )
 );
-
 
 named!(parse_untracked_status_entry<&str, StatusEntry>,
     do_parse!(
@@ -308,7 +314,7 @@ named!(parse_status_entry<&str, StatusEntry>,
     )
 );
 
-named!(pub parse_status_entries<&str, Vec<StatusEntry>>,
+named!(parse_status_entries<&str, Vec<StatusEntry>>,
     do_parse!(
         entries: separated_list!(
             char!('\n'),
@@ -318,3 +324,224 @@ named!(pub parse_status_entries<&str, Vec<StatusEntry>>,
         (entries)
     )
 );
+
+#[derive(Debug, Serialize)]
+pub struct AncestorSide {
+    file_mode: u32,
+    oid: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConflictSide {
+    file_mode: u32,
+    oid: String,
+    status: Status,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConflictStatusEntry {
+    ancestor: AncestorSide,
+    our: ConflictSide,
+    path: String,
+    submodule_status: Option<SubmoduleStatus>,
+    their: ConflictSide,
+    worktree_file_mode: u32,
+}
+
+impl ConflictStatusEntry {
+    fn from_unmerged_status_entry(entry: &UnmergedStatusEntry) -> StatusEntryOutput {
+        StatusEntryOutput::Conflict(Self {
+            ancestor: AncestorSide {
+                file_mode: entry.file_mode.stage_1.clone(),
+                oid: entry.oids.stage_1.clone(),
+            },
+            our: ConflictSide {
+                file_mode: entry.file_mode.stage_2.clone(),
+                oid: entry.oids.stage_2.clone(),
+                status: entry.staged_status.clone(),
+            },
+            path: entry.path.clone(),
+            submodule_status: entry.submodule_status.clone(),
+            their: ConflictSide {
+                file_mode: entry.file_mode.stage_3.clone(),
+                oid: entry.oids.stage_3.clone(),
+                status: entry.unstaged_status.clone(),
+            },
+            worktree_file_mode: entry.file_mode.worktree.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct StagedStatusEntry {
+    file_mode: u32,
+    oids: StatusOids,
+    original_path: Option<String>,
+    path: String,
+    score: Option<Score>,
+    status: Status,
+    submodule_status: Option<SubmoduleStatus>,
+}
+
+impl StagedStatusEntry {
+    fn from_ordinary_status_entry(entry: &OrdinaryStatusEntry) -> Option<StatusEntryOutput> {
+        entry.staged_status.as_ref().map(|status| {
+            StatusEntryOutput::Staged(Self {
+                file_mode: entry.file_mode.index.clone(),
+                oids: entry.oids.clone(),
+                original_path: None,
+                path: entry.path.clone(),
+                score: None,
+                status: status.clone(),
+                submodule_status: entry.submodule_status.clone().map(|_| SubmoduleStatus {
+                    commit_changed: false,
+                    has_tracked_changes: false,
+                    has_untracked_changes: false,
+                }),
+            })
+        })
+    }
+
+    fn from_copied_or_renamed_status_entry(
+        entry: &CopiedOrRenamedStatusEntry,
+    ) -> Option<StatusEntryOutput> {
+        entry.staged_status.as_ref().map(|status| {
+            StatusEntryOutput::Staged(Self {
+                file_mode: entry.file_mode.index.clone(),
+                oids: entry.oids.clone(),
+                original_path: Some(entry.original_path.clone()),
+                path: entry.path.clone(),
+                score: Some(entry.score.clone()),
+                status: status.clone(),
+                submodule_status: entry.submodule_status.clone().map(|_| SubmoduleStatus {
+                    commit_changed: false,
+                    has_tracked_changes: false,
+                    has_untracked_changes: false,
+                }),
+            })
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct UnstagedStatusEntry {
+    file_mode: Option<u32>,
+    oids: Option<StatusOids>,
+    path: String,
+    status: Status,
+    submodule_status: Option<SubmoduleStatus>,
+}
+
+impl UnstagedStatusEntry {
+    fn from_ordinary_status_entry(entry: &OrdinaryStatusEntry) -> Option<StatusEntryOutput> {
+        entry.unstaged_status.as_ref().map(|status| {
+            StatusEntryOutput::Unstaged(Self {
+                file_mode: Some(entry.file_mode.worktree.clone()),
+                oids: Some(entry.oids.clone()),
+                path: entry.path.clone(),
+                status: status.clone(),
+                submodule_status: entry.submodule_status.clone(),
+            })
+        })
+    }
+
+    fn from_copied_or_renamed_status_entry(
+        entry: &CopiedOrRenamedStatusEntry,
+    ) -> Option<StatusEntryOutput> {
+        entry.unstaged_status.as_ref().map(|status| {
+            StatusEntryOutput::Unstaged(Self {
+                file_mode: Some(entry.file_mode.worktree.clone()),
+                oids: Some(entry.oids.clone()),
+                path: entry.path.clone(),
+                status: status.clone(),
+                submodule_status: entry.submodule_status.clone(),
+            })
+        })
+    }
+
+    fn from_untracked_status_entry(entry: &UntrackedStatusEntry) -> StatusEntryOutput {
+        StatusEntryOutput::Unstaged(Self {
+            file_mode: None,
+            oids: None,
+            path: entry.path.clone(),
+            status: Status::Added,
+            submodule_status: None,
+        })
+    }
+}
+
+pub enum StatusEntryOutput {
+    Conflict(ConflictStatusEntry),
+    Ignored(IgnoredStatusEntry),
+    Staged(StagedStatusEntry),
+    Unstaged(UnstagedStatusEntry),
+}
+
+#[derive(Debug, Default, Serialize)]
+pub struct StatusResult {
+    conflicts: Vec<ConflictStatusEntry>,
+    ignored: Vec<IgnoredStatusEntry>,
+    staged: Vec<StagedStatusEntry>,
+    unstaged: Vec<UnstagedStatusEntry>,
+}
+
+impl StatusResult {
+    fn new() -> StatusResult {
+        Default::default()
+    }
+}
+
+pub fn build_git_status_output(entries: Vec<StatusEntry>) -> StatusResult {
+    entries
+        .iter()
+        .map(|entry| -> Vec<Option<StatusEntryOutput>> {
+            match entry {
+                StatusEntry::OrdinaryStatusEntry(entry) => vec![
+                    StagedStatusEntry::from_ordinary_status_entry(entry),
+                    UnstagedStatusEntry::from_ordinary_status_entry(entry),
+                ],
+                StatusEntry::CopiedOrRenamedStatusEntry(entry) => vec![
+                    StagedStatusEntry::from_copied_or_renamed_status_entry(entry),
+                    UnstagedStatusEntry::from_copied_or_renamed_status_entry(entry),
+                ],
+                StatusEntry::UnmergedStatusEntry(entry) => {
+                    vec![Some(ConflictStatusEntry::from_unmerged_status_entry(entry))]
+                }
+                StatusEntry::UntrackedStatusEntry(entry) => vec![
+                    Some(UnstagedStatusEntry::from_untracked_status_entry(entry)),
+                ],
+                StatusEntry::IgnoredStatusEntry(entry) => {
+                    // this is not ideal
+                    vec![Some(StatusEntryOutput::Ignored(entry.clone()))]
+                }
+            }
+        })
+        .flat_map(|entry| entry)
+        .filter_map(|option| option)
+        .fold(StatusResult::new(), |mut status_result, entry| {
+            match entry {
+                StatusEntryOutput::Conflict(conflict) => {
+                    status_result.conflicts.push(conflict);
+                }
+                StatusEntryOutput::Ignored(ignored) => {
+                    status_result.ignored.push(ignored);
+                }
+                StatusEntryOutput::Staged(staged) => {
+                    status_result.staged.push(staged);
+                }
+                StatusEntryOutput::Unstaged(unstaged) => {
+                    status_result.unstaged.push(unstaged);
+                }
+            };
+            status_result
+        })
+}
+
+pub fn parse_git_status(input: &str) -> Result<StatusResult, Error> {
+    let mut input = String::from(input);
+    input.push('\0');
+
+    parse_status_entries(&input)
+        .map_err(|_| Error::Process(Parsing))
+        .map(|(_, vec)| build_git_status_output(vec))
+}

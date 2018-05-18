@@ -1,7 +1,7 @@
 mod status_entry;
 
+use self::status_entry::{parse_git_status, StatusResult};
 use futures::{future, Future};
-use self::status_entry::{parse_status_entries, StatusEntry};
 use state;
 use std::str;
 use tokio_process::CommandExt;
@@ -18,13 +18,13 @@ pub enum ErrorReason {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum OutboundMessage {
-    Success { result: Vec<StatusEntry> },
+    Success { status: StatusResult },
     Error(ErrorReason),
 }
 
 pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
     use self::ErrorReason::RepoPathNotSet;
-    use error::protocol::{Error, ProcessError::{Encoding, Failed}};
+    use error::protocol::{Error, ProcessError::{Encoding, Failed, Parsing}};
 
     match connection_state.repo_path.clone() {
         Some(repo_path) => Box::new(
@@ -39,9 +39,12 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                     Err(_) => future::err(Error::Process(Encoding)),
                 })
                 .and_then(|result| -> DispatchFuture {
-                    match parse_status_entries(&result) {
-                        Ok((_, result)) => Box::new(send_message(connection_state, OutboundMessage::Success { result })),
-                        Err(_err) => Box::new(future::err(Error::Process(Encoding))), // TODO Change me to something else please
+                    match parse_git_status(&result) {
+                        Ok(status) => Box::new(send_message(
+                            connection_state,
+                            OutboundMessage::Success { status },
+                        )),
+                        Err(e) => Box::new(future::err(e)),
                     }
                 }),
         ),

@@ -35,6 +35,7 @@ pub mod protocol {
     pub enum ProcessError {
         Encoding,
         Failed,
+        Parsing,
     }
 
     #[derive(Debug)]
