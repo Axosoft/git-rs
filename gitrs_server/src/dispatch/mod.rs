@@ -4,7 +4,6 @@ mod git_command;
 use self::dispatch::dispatch;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
-use message;
 use semver::Version;
 use state;
 use std::sync::{Arc, Mutex};

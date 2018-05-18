@@ -13,7 +13,7 @@ use tokio_io::codec::length_delimited;
 
 pub type Transport = length_delimited::Framed<TcpStream, Bytes>;
 
-pub fn deserialize<T>(bytes: BytesMut) -> Result<T, error::protocol::Error>
+pub fn deserialize<T>(bytes: &BytesMut) -> Result<T, error::protocol::Error>
 where
     T: DeserializeOwned,
 {
@@ -54,7 +54,7 @@ where
                 None => unimplemented!(),
             };
             println!("received message; message={:?}", response);
-            deserialize(response).map(|message| {
+            deserialize(&response).map(|message| {
                 println!("deserialized message; message={:?}", message);
                 connection_state.transport = Some(transport);
                 (message, connection_state)

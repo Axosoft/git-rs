@@ -21,9 +21,6 @@ mod types;
 mod util;
 
 use dispatch::init_dispatch;
-use futures::sync::mpsc::UnboundedSender as Sender;
-use message::channel;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
