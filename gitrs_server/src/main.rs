@@ -1,5 +1,7 @@
 extern crate bytes;
 extern crate futures;
+#[macro_use]
+extern crate nom;
 extern crate semver;
 extern crate serde;
 #[macro_use]
