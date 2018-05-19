@@ -1,3 +1,4 @@
+mod bisect;
 mod open_repo;
 mod status;
 
@@ -12,6 +13,7 @@ pub fn dispatch(
     use self::git_command::Inbound;
 
     match message {
+        Inbound::Bisect { bad, good } => bisect::dispatch(connection_state, bad, good),
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
         Inbound::Status => status::dispatch(connection_state),
     }
