@@ -1,9 +1,6 @@
 use error::protocol::{Error, ProcessError::Parsing};
-use nom::{self, digit1, oct_digit1};
-
-fn parse_num(input: &str, radix: u32) -> u32 {
-    u32::from_str_radix(input, radix).unwrap()
-}
+use nom::{digit1, oct_digit1};
+use util::parse::{sha, parse_u32};
 
 #[derive(Clone, Debug, Serialize)]
 pub enum Status {
@@ -51,9 +48,9 @@ named!(parse_file_mode<&str, FileModeStatus>,
         char!(' ') >>
         worktree: oct_digit1 >>
         (FileModeStatus {
-            head: parse_num(head, 8),
-            index: parse_num(index, 8),
-            worktree: parse_num(worktree, 8)
+            head: parse_u32(head, 8),
+            index: parse_u32(index, 8),
+            worktree: parse_u32(worktree, 8)
         })
     )
 );
@@ -76,10 +73,10 @@ named!(parse_unmerged_file_mode<&str, UnmergedFileModeStatus>,
         char!(' ') >>
         worktree: oct_digit1 >>
         (UnmergedFileModeStatus {
-            stage_1: parse_num(stage_1, 8),
-            stage_2: parse_num(stage_2, 8),
-            stage_3: parse_num(stage_3, 8),
-            worktree: parse_num(worktree, 8)
+            stage_1: parse_u32(stage_1, 8),
+            stage_2: parse_u32(stage_2, 8),
+            stage_3: parse_u32(stage_3, 8),
+            worktree: parse_u32(worktree, 8)
         })
     )
 );
@@ -100,7 +97,7 @@ named!(parse_score<&str, Score>,
     do_parse!(
         score_type: switch!(take!(1), "R" => value!(ScoreType::Renamed) | "C" => value!(ScoreType::Copied)) >>
         percentage: digit1 >>
-        (Score { score_type, percentage: parse_num(percentage, 10) })
+        (Score { score_type, percentage: parse_u32(percentage, 10) })
     )
 );
 
@@ -135,9 +132,9 @@ pub struct StatusOids {
 
 named!(parse_status_oids<&str, StatusOids>,
     do_parse!(
-        head: take!(40) >>
+        head: sha >>
         char!(' ') >>
-        index: take!(40) >>
+        index: sha >>
         (StatusOids { head: head.to_string(), index: index.to_string() })
     )
 );
@@ -151,11 +148,11 @@ pub struct UnmergedStatusOids {
 
 named!(parse_unmerged_status_oids<&str, UnmergedStatusOids>,
     do_parse!(
-        stage_1: take!(40) >>
+        stage_1: sha >>
         char!(' ') >>
-        stage_2: take!(40) >>
+        stage_2: sha >>
         char!(' ') >>
-        stage_3: take!(40) >>
+        stage_3: sha >>
         (UnmergedStatusOids {
             stage_1: stage_1.to_string(),
             stage_2: stage_2.to_string(),

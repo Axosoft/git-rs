@@ -24,7 +24,7 @@ pub enum OutboundMessage {
 
 pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
     use self::ErrorReason::RepoPathNotSet;
-    use error::protocol::{Error, ProcessError::{Encoding, Failed, Parsing}};
+    use error::protocol::{Error, ProcessError::{Encoding, Failed}};
 
     match connection_state.repo_path.clone() {
         Some(repo_path) => Box::new(
