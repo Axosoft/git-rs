@@ -12,6 +12,7 @@ use util::transport::send_message;
 #[derive(Debug, Serialize)]
 #[serde(tag = "reason")]
 pub enum ErrorReason {
+    RepoHasNoCommits,
     RepoPathNotSet,
 }
 
@@ -23,7 +24,7 @@ pub enum OutboundMessage {
 }
 
 pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
-    use self::ErrorReason::RepoPathNotSet;
+    use self::ErrorReason::{RepoHasNoCommits, RepoPathNotSet};
     use error::protocol::{Error, ProcessError::{Encoding, Failed, Parsing}};
 
     match connection_state.repo_path.clone() {
@@ -38,8 +39,10 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                 })
                 .and_then(|result| -> DispatchFuture {
                     if result.len() == 0 {
-                        // TODO: more semantic error
-                        return Box::new(future::err(Error::Process(Parsing)));
+                        return Box::new(send_message(
+                            connection_state,
+                            OutboundMessage::Error(RepoHasNoCommits),
+                        ));
                     }
 
                     match parse_log(&format!("{}\n", result)) {
