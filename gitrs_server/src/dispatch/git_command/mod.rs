@@ -1,4 +1,5 @@
 mod bisect;
+mod log;
 mod open_repo;
 mod status;
 
@@ -14,6 +15,7 @@ pub fn dispatch(
 
     match message {
         Inbound::Bisect { bad, good } => bisect::dispatch(connection_state, bad, good),
+        Inbound::Log => log::dispatch(connection_state),
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
         Inbound::Status => status::dispatch(connection_state),
     }

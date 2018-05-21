@@ -1,5 +1,5 @@
 use nom::digit1;
-use util::parse::{parse_u32, sha};
+use util::parse::{sha, parse_u32};
 
 #[derive(Debug, Serialize)]
 pub struct BisectStep {
