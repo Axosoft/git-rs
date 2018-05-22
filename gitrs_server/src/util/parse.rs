@@ -3,3 +3,5 @@ pub fn parse_u32(input: &str, radix: u32) -> u32 {
 }
 
 named!(pub sha<&str, &str>, take!(40));
+
+named!(pub short_sha<&str, &str>, take!(7));
