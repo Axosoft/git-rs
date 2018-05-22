@@ -4,7 +4,7 @@ use util::parse::{sha, short_sha};
 #[derive(Debug, Serialize)]
 pub struct TreeInfo {
     sha: String,
-    parents: String,
+    parents: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -78,17 +78,24 @@ pub struct LogEntry {
 //     (input, "")
 // }
 
+named!(pub parse_parent_entries<&str, Vec<String>>, 
+    do_parse!( 
+        entries: take_until!("\n") >>
+        (entries.split(" ").map(|s| s.to_string()).collect())
+    ) 
+);
+
 named!(pub parse_tree<&str, TreeInfo>,
     do_parse!(
         tag!("sha ") >>
         sha: sha >>
         char!('\n') >>
         tag!("parents ") >>
-        parents: take_until!("\n") >>
+        parents: parse_parent_entries >>
         char!('\n') >>
         (TreeInfo {
             sha: String::from(sha),
-            parents: String::from(parents),
+            parents: parents,
         })
     )
 );
