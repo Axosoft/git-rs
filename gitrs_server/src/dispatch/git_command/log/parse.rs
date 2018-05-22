@@ -1,4 +1,4 @@
-use nom;
+use error::protocol::{Error, ProcessError::Parsing};
 use util::parse::sha;
 
 #[derive(Debug, Serialize)]
@@ -34,7 +34,7 @@ named!(pub parse_log_entry<&str, LogEntry>,
     )
 );
 
-named!(pub parse_log<&str, Vec<LogEntry>>,
+named!(pub parse_log_entries<&str, Vec<LogEntry>>,
     do_parse!(
         entries: separated_list!(
             tag!("\n\n"),
@@ -43,3 +43,12 @@ named!(pub parse_log<&str, Vec<LogEntry>>,
         (entries)
     )
 );
+
+pub fn parse_log(input: &str) -> Result<Vec<LogEntry>, Error> {
+    let mut input = String::from(input);
+    input.push('\n');
+
+    parse_log_entries(&input)
+        .map_err(|_| Error::Process(Parsing))
+        .map(|(_, vec)| vec)
+}

@@ -45,8 +45,8 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                         ));
                     }
 
-                    match parse_log(&format!("{}\n", result)) {
-                        Ok((_, log)) => Box::new(send_message(
+                    match parse_log(&result) {
+                        Ok(log) => Box::new(send_message(
                             connection_state,
                             OutboundMessage::Success { log },
                         )),
