@@ -31,7 +31,7 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
         Some(repo_path) => Box::new(
             git::new_command_with_repo_path(&repo_path)
                 .arg("log")
-                .arg("--format='sha %H%nparents %P%nauthor %an%ndate %ci%nsummary %s%description %b%x00%x00'")
+                .arg("--format=sha %H%nparents %P%nauthor %an%nemail %ae%ndate %ci%nsummary %s%ndescription %b%x00%x00")
                 .output_async()
                 .map_err(|_| Error::Process(Failed))
                 .and_then(|output| match str::from_utf8(&output.stdout) {

@@ -86,7 +86,6 @@ named!(pub parse_tree<&str, TreeInfo>,
         tag!("parents ") >>
         parents: take_until!("\n") >>
         char!('\n') >>
-        // value!(printstuff, sha, parents) >>
         (TreeInfo {
             sha: String::from(sha),
             parents: String::from(parents),
@@ -99,8 +98,10 @@ named!(pub parse_signature<&str, SignatureInfo>,
         tag!("author ") >>
         author: take_until!("\n") >>
         char!('\n') >>
+        tag!("email ") >>
         email: take_until!("\n") >>
         char!('\n') >>
+        tag!("date ") >>
         date: take_until!("\n") >>
         char!('\n') >>
         (SignatureInfo {
@@ -117,7 +118,7 @@ named!(pub parse_body<&str, BodyInfo>,
         summary: take_until!("\n") >>
         char!('\n') >>
         tag!("description ") >>
-        description: take_until!("\0\0") >>
+        description: take_until!("\0\0\n") >>
         (BodyInfo {
             summary: String::from(summary),
             description: String::from(description),
@@ -141,7 +142,7 @@ named!(pub parse_log_entry<&str, LogEntry>,
 named!(pub parse_log_entries<&str, Vec<LogEntry>>,
     do_parse!(
         entries: separated_list!(
-            tag!("\0\0"),
+            tag!("\0\0\n"),
             complete!(parse_log_entry)
         ) >>
         (entries)
