@@ -78,11 +78,16 @@ pub struct LogEntry {
 //     (input, "")
 // }
 
-named!(pub parse_parent_entries<&str, Vec<String>>, 
-    do_parse!( 
+named!(pub parse_parent_entries<&str, Vec<String>>,
+    do_parse!(
         entries: take_until!("\n") >>
-        (entries.split(" ").map(|s| s.to_string()).collect())
-    ) 
+        (
+            match entries {
+                "" => Vec::new(),
+                _ => entries.split(" ").map(|s| s.to_string()).collect()
+            }
+        )
+    )
 );
 
 named!(pub parse_tree<&str, TreeInfo>,
