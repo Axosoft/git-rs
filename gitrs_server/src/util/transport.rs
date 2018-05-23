@@ -33,7 +33,10 @@ where
 
 pub fn read_message<T: Send + 'static>(
     mut connection_state: state::Connection,
-) -> impl Future<Item = (T, state::Connection), Error = (error::protocol::Error, state::Connection)>
+) -> Box<
+    Future<Item = (T, state::Connection), Error = (error::protocol::Error, state::Connection)>
+        + Send,
+>
 where
     T: DeserializeOwned + Debug,
 {
@@ -64,14 +67,7 @@ where
         None => Box::new(future::err((
             Error::Process(ProcessError::Failed),
             connection_state,
-        )))
-            as Box<
-                Future<
-                        Item = (T, state::Connection),
-                        Error = (error::protocol::Error, state::Connection),
-                    >
-                    + Send,
-            >,
+        ))),
     }
 }
 
@@ -96,6 +92,6 @@ where
         None => Box::new(future::err((
             Error::Process(ProcessError::Failed),
             connection_state,
-        ))) as DispatchFuture,
+        ))),
     }
 }
