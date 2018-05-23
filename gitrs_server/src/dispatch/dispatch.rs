@@ -1,5 +1,5 @@
 use super::git_command;
-use futures::{future, Future};
+use futures::future;
 use message;
 use state;
 use types::DispatchFuture;

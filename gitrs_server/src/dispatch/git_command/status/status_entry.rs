@@ -535,7 +535,10 @@ pub fn build_git_status_output(entries: Vec<StatusEntry>) -> StatusResult {
 }
 
 pub fn parse_git_status(input: &str) -> Result<StatusResult, Error> {
-    parse_status_entries(input)
+    let mut input = String::from(input);
+    input.push('\0');
+
+    parse_status_entries(&input)
         .map_err(|_| Error::Process(Parsing))
         .map(|(_, vec)| build_git_status_output(vec))
 }

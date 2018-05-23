@@ -31,7 +31,7 @@ pub mod protocol {
         Unexpected,
     }
 
-    #[derive(Debug, Serialize)]
+    #[derive(Debug)]
     pub enum ProcessError {
         Encoding,
         Failed,
@@ -45,18 +45,6 @@ pub mod protocol {
         Process(ProcessError),
         TcpReceive(TcpReceiveError),
         TcpSend(TcpSendError),
-    }
-
-    #[derive(Debug)]
-    pub enum SubhandlerError<T> {
-        Shared(Error),
-        Subhandler(T),
-    }
-
-    impl<T> From<Error> for SubhandlerError<T> {
-        fn from(error: Error) -> Self {
-            SubhandlerError::Shared(error)
-        }
     }
 
     impl From<str::Utf8Error> for Error {
