@@ -14,6 +14,6 @@ pub fn dispatch(
 
     match message {
         Inbound::GitCommand(git_command) => git_command::dispatch(connection_state, git_command),
-        _ => Box::new(future::err(Error::InboundMessage(Unexpected))),
+        _ => Box::new(future::err((Error::InboundMessage(Unexpected), connection_state))),
     }
 }

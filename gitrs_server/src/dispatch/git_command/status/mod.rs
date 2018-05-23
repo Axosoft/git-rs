@@ -33,18 +33,20 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                 .arg("--porcelain=v2")
                 .arg("--untracked-files")
                 .output_async()
-                .map_err(|_| Error::Process(Failed))
-                .and_then(|output| match str::from_utf8(&output.stdout) {
-                    Ok(output) => future::ok(String::from(output)),
-                    Err(_) => future::err(Error::Process(Encoding)),
+                .then(|result| match result {
+                    Ok(output) => match str::from_utf8(&output.stdout) {
+                        Ok(output) => future::ok((String::from(output), connection_state)),
+                        Err(_) => future::err((Error::Process(Encoding), connection_state)),
+                    },
+                    Err(_) => future::err((Error::Process(Failed), connection_state))
                 })
-                .and_then(|result| -> DispatchFuture {
+                .and_then(|(result, connection_state)| -> DispatchFuture {
                     match parse_git_status(&result) {
                         Ok(status) => Box::new(send_message(
                             connection_state,
                             OutboundMessage::Success { status },
                         )),
-                        Err(e) => Box::new(future::err(e)),
+                        Err(e) => Box::new(future::err((e, connection_state))),
                     }
                 }),
         ),

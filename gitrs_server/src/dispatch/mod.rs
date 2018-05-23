@@ -18,7 +18,7 @@ macro_rules! read_validated_message {
 
             match response {
                 $messagePattern => Ok((response, connection_state)),
-                _ => Err(Error::InboundMessage(InboundMessageError::Unexpected)),
+                _ => Err((Error::InboundMessage(InboundMessageError::Unexpected), connection_state)),
             }
         })
     };
@@ -45,7 +45,7 @@ pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
                     |(response, connection_state)| -> Box<
                         Future<
                                 Item = Loop<state::Connection, state::Connection>,
-                                Error = ::error::protocol::Error,
+                                Error = (::error::protocol::Error, state::Connection),
                             >
                             + Send,
                     > {
@@ -60,7 +60,7 @@ pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
         })
         .and_then(|transport| send_message(transport, Outbound::Goodbye { error_code: None }))
         .and_then(|_| Ok(()))
-        .map_err(|err| println!("error; err={:?}", err));
+        .map_err(|(err, _connection_state)| println!("error; err={:?}", err));
 
     tokio::spawn(connection);
 }

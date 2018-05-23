@@ -10,6 +10,7 @@ use std::fmt::Debug;
 use std::str;
 use tokio::net::TcpStream;
 use tokio_io::codec::length_delimited;
+use types::DispatchFuture;
 
 pub type Transport = length_delimited::Framed<TcpStream, Bytes>;
 
@@ -30,43 +31,52 @@ where
     Ok(Bytes::from(message.into_bytes()))
 }
 
-pub fn read_message<T>(
+pub fn read_message<T: Send + 'static>(
     mut connection_state: state::Connection,
-) -> impl Future<Item = (T, state::Connection), Error = error::protocol::Error>
+) -> impl Future<Item = (T, state::Connection), Error = (error::protocol::Error, state::Connection)>
 where
     T: DeserializeOwned + Debug,
 {
     use error::protocol::{Error, ProcessError, TcpReceiveError};
 
-    future::result(
-        connection_state
-            .transport
-            .take()
-            .ok_or(Error::Process(ProcessError::Failed)),
-    ).and_then(|transport| {
-        transport
-            .into_future()
-            .map_err(|_| Error::TcpReceive(TcpReceiveError::Io))
-    })
-        .and_then(|(response, transport)| {
-            let response = match response {
-                Some(x) => x,
-                None => unimplemented!(),
-            };
-            println!("received message; message={:?}", response);
-            deserialize(&response).map(|message| {
-                println!("deserialized message; message={:?}", message);
+    match connection_state.transport.take() {
+        Some(transport) => Box::new(transport.into_future().then(|result| match result {
+            Ok((response, transport)) => {
+                let response = match response {
+                    Some(x) => x,
+                    None => unimplemented!(),
+                };
+                println!("received message; message={:?}", response);
                 connection_state.transport = Some(transport);
-                (message, connection_state)
-            })
-        })
+                match deserialize(&response) {
+                    Ok(message) => {
+                        println!("deserialized message; message={:?}", message);
+                        future::ok((message, connection_state))
+                    }
+                    Err(err) => future::err((err, connection_state)),
+                }
+            }
+            Err((_, transport)) => {
+                connection_state.transport = Some(transport);
+                future::err((Error::TcpReceive(TcpReceiveError::Io), connection_state))
+            }
+        })),
+        None => Box::new(future::err((
+            Error::Process(ProcessError::Failed),
+            connection_state,
+        )))
+            as Box<
+                Future<
+                        Item = (T, state::Connection),
+                        Error = (error::protocol::Error, state::Connection),
+                    >
+                    + Send,
+            >,
+    }
 }
 
 #[allow(needless_pass_by_value)]
-pub fn send_message<T>(
-    mut connection_state: state::Connection,
-    message: T,
-) -> impl Future<Item = state::Connection, Error = error::protocol::Error>
+pub fn send_message<T>(mut connection_state: state::Connection, message: T) -> DispatchFuture
 where
     T: Serialize + Debug,
 {
@@ -75,18 +85,17 @@ where
     let message =
         serialize(&message).expect(&format!("Could not serialize message: {:?}", message));
 
-    future::result(
-        connection_state
-            .transport
-            .take()
-            .ok_or(Error::Process(ProcessError::Failed)),
-    ).and_then(|transport| {
-        transport
-            .send(message)
-            .map_err(|_| Error::TcpSend(TcpSendError::Io))
-    })
-        .map(|transport| {
-            connection_state.transport = Some(transport);
-            connection_state
-        })
+    match connection_state.transport.take() {
+        Some(transport) => Box::new(transport.send(message).then(|result| match result {
+            Ok(transport) => {
+                connection_state.transport = Some(transport);
+                future::ok(connection_state)
+            }
+            Err(_) => future::err((Error::TcpSend(TcpSendError::Io), connection_state)),
+        })),
+        None => Box::new(future::err((
+            Error::Process(ProcessError::Failed),
+            connection_state,
+        ))) as DispatchFuture,
+    }
 }

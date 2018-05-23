@@ -33,12 +33,14 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                 .arg("log")
                 .arg("--format=sha %H%nparents %P%nauthor %an%nemail %ae%ndate %ai%nsummary %s%ndescription %b%x00%x00")
                 .output_async()
-                .map_err(|_| Error::Process(Failed))
-                .and_then(|output| match str::from_utf8(&output.stdout) {
-                    Ok(output) => future::ok(String::from(output)),
-                    Err(_) => future::err(Error::Process(Encoding)),
+                .then(|result| match result {
+                    Ok(output) => match str::from_utf8(&output.stdout) {
+                        Ok(output) => future::ok((String::from(output), connection_state)),
+                        Err(_) => future::err((Error::Process(Encoding), connection_state)),
+                    },
+                      Err(_) => future::err((Error::Process(Failed), connection_state))
                 })
-                .and_then(|result| -> DispatchFuture {
+                .and_then(|(result, connection_state)| -> DispatchFuture {
                     if result.len() == 0 {
                         return Box::new(send_message(
                             connection_state,
@@ -51,7 +53,7 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                             connection_state,
                             OutboundMessage::Success { log },
                         )),
-                        Err(_) => Box::new(future::err(Error::Process(Parsing))),
+                        Err(_) => Box::new(future::err((Error::Process(Parsing), connection_state))),
                     }
                 }),
         ),

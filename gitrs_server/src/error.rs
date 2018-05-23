@@ -39,6 +39,18 @@ pub mod protocol {
     }
 
     #[derive(Debug)]
+    pub enum SubhandlerError<T> {
+        Shared(Error),
+        Subhandler(T),
+    }
+
+    impl<T> From<Error> for SubhandlerError<T> {
+        fn from(error: Error) -> Self {
+            SubhandlerError::Shared(error)
+        }
+    }
+
+    #[derive(Debug)]
     pub enum Error {
         Deserialization(DeserializationError),
         InboundMessage(InboundMessageError),
