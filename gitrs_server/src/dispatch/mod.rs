@@ -18,10 +18,7 @@ macro_rules! read_validated_message {
 
             match response {
                 $messagePattern => Ok((response, connection_state)),
-                _ => Err((
-                    Error::InboundMessage(InboundMessageError::Unexpected),
-                    connection_state,
-                )),
+                _ => Err((Error::InboundMessage(InboundMessageError::Unexpected), connection_state)),
             }
         })
     };

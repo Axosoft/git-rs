@@ -42,17 +42,11 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                 })
                 .and_then(|(result, connection_state)| -> DispatchFuture {
                     match parse_git_status(&result) {
-                        Ok(status) => Box::new(send_message(
-                            connection_state,
-                            OutboundMessage::Success { status },
-                        )),
+                        Ok(status) => Box::new(send_message(connection_state, OutboundMessage::Success { status })),
                         Err(e) => Box::new(future::err((e, connection_state))),
                     }
                 }),
         ),
-        None => Box::new(send_message(
-            connection_state,
-            OutboundMessage::Error(RepoPathNotSet),
-        )),
+        None => Box::new(send_message(connection_state, OutboundMessage::Error(RepoPathNotSet))),
     }
 }

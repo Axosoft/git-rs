@@ -42,24 +42,15 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                 })
                 .and_then(|(result, connection_state)| -> DispatchFuture {
                     if result.len() == 0 {
-                        return Box::new(send_message(
-                            connection_state,
-                            OutboundMessage::Error(RepoHasNoCommits),
-                        ));
+                        return Box::new(send_message(connection_state, OutboundMessage::Error(RepoHasNoCommits)));
                     }
 
                     match parse_log(&result) {
-                        Ok(log) => Box::new(send_message(
-                            connection_state,
-                            OutboundMessage::Success { log },
-                        )),
+                        Ok(log) => Box::new(send_message(connection_state, OutboundMessage::Success { log })),
                         Err(_) => Box::new(future::err((Error::Process(Parsing), connection_state))),
                     }
                 }),
         ),
-        None => Box::new(send_message(
-            connection_state,
-            OutboundMessage::Error(RepoPathNotSet),
-        )),
+        None => Box::new(send_message(connection_state, OutboundMessage::Error(RepoPathNotSet))),
     }
 }

@@ -33,10 +33,7 @@ where
 
 pub fn read_message<T: Send + 'static>(
     mut connection_state: state::Connection,
-) -> Box<
-    Future<Item = (T, state::Connection), Error = (error::protocol::Error, state::Connection)>
-        + Send,
->
+) -> Box<Future<Item = (T, state::Connection), Error = (error::protocol::Error, state::Connection)> + Send>
 where
     T: DeserializeOwned + Debug,
 {
@@ -64,10 +61,7 @@ where
                 future::err((Error::TcpReceive(TcpReceiveError::Io), connection_state))
             }
         })),
-        None => Box::new(future::err((
-            Error::Process(ProcessError::Failed),
-            connection_state,
-        ))),
+        None => Box::new(future::err((Error::Process(ProcessError::Failed), connection_state))),
     }
 }
 
@@ -78,8 +72,7 @@ where
 {
     use error::protocol::{Error, ProcessError, TcpSendError};
 
-    let message =
-        serialize(&message).expect(&format!("Could not serialize message: {:?}", message));
+    let message = serialize(&message).expect(&format!("Could not serialize message: {:?}", message));
 
     match connection_state.transport.take() {
         Some(transport) => Box::new(transport.send(message).then(|result| match result {
@@ -89,9 +82,6 @@ where
             }
             Err(_) => future::err((Error::TcpSend(TcpSendError::Io), connection_state)),
         })),
-        None => Box::new(future::err((
-            Error::Process(ProcessError::Failed),
-            connection_state,
-        ))),
+        None => Box::new(future::err((Error::Process(ProcessError::Failed), connection_state))),
     }
 }
