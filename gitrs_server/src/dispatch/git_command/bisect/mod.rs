@@ -1,6 +1,6 @@
 mod parse;
 
-use self::parse::{parse_bisect, BisectOutput, BisectStep, BisectSuccess};
+use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectStep};
 use error::protocol::SubhandlerError;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
@@ -27,7 +27,6 @@ macro_rules! enclose {
 enum InboundMessage {
     Bad,
     Good,
-    Reset,
 }
 
 #[derive(Debug, Serialize)]
@@ -40,8 +39,8 @@ enum BisectError {
 #[serde(tag = "type")]
 enum OutboundMessage {
     Step(BisectStep),
-    Success(BisectSuccess),
     Error(BisectError),
+    Finish(BisectFinish),
 }
 
 pub fn dispatch(connection_state: state::Connection, bad: String, good: String) -> DispatchFuture {
@@ -83,6 +82,12 @@ pub fn dispatch(connection_state: state::Connection, bad: String, good: String) 
                 command
             }};
 
+            let build_command_reset = enclose! { (repo_path) move || {
+                let mut command = git::new_command_with_repo_path(&repo_path);
+                command.arg("bisect").arg("reset");
+                command
+            }};
+
             loop_fn(
                 (build_command_start, connection_state),
                 move |(build_command, connection_state)| {
@@ -105,14 +110,27 @@ pub fn dispatch(connection_state: state::Connection, bad: String, good: String) 
                             }
                         })
                         .and_then(
-                            enclose! { (build_command_bad, build_command_good) move |(output, connection_state)| -> Box<Future<Item = _, Error = _> + Send> {
+                            enclose! { (build_command_bad, build_command_good, build_command_reset) move |(output, connection_state)| -> Box<Future<Item = _, Error = _> + Send> {
                                 match parse_bisect(&output[..]) {
                                     Ok((_, output)) => match output {
-                                        BisectOutput::Success(bisect_success) => Box::new(
-                                            send_message(connection_state, OutboundMessage::Success(bisect_success))
-                                                .map_err(|(err, connection_state)| (SubhandlerError::Shared(err), connection_state))
-                                                .map(|connection_state| Loop::Break(connection_state)),
-                                        ),
+                                        BisectOutput::Finish(bisect_finish) => Box::new(
+                                            build_command_reset()
+                                                .output_async()
+                                                .then(|result| -> Box<Future<Item = _, Error = _> + Send> {
+                                                    println!("Reset command finished!");
+                                                    match result {
+                                                        Ok(_) => Box::new(
+                                                            send_message(connection_state, OutboundMessage::Finish(bisect_finish))
+                                                                .map_err(|(err, connection_state)| (SubhandlerError::Shared(err), connection_state))
+                                                        ),
+                                                        Err(err) => Box::new(future::err((
+                                                            SubhandlerError::Shared(Process(Failed)),
+                                                            connection_state
+                                                        )))
+                                                    }
+                                                })
+                                                .map(Loop::Break)
+                                            ),
                                         BisectOutput::Step(bisect_step) => Box::new(
                                             send_message(connection_state, OutboundMessage::Step(bisect_step))
                                                 .map_err(|(err, connection_state)| (SubhandlerError::Shared(err), connection_state))
@@ -122,12 +140,12 @@ pub fn dispatch(connection_state: state::Connection, bad: String, good: String) 
                                                 })
                                                 .and_then(|(message, connection_state)| {
                                                     match message {
-                                                        self::InboundMessage::Good => future::ok(Loop::Continue((
-                                                            Box::new(build_command_good) as CommandBuilder,
-                                                            connection_state,
-                                                        ))),
                                                         self::InboundMessage::Bad => future::ok(Loop::Continue((
                                                             Box::new(build_command_bad) as CommandBuilder,
+                                                            connection_state,
+                                                        ))),
+                                                        self::InboundMessage::Good => future::ok(Loop::Continue((
+                                                            Box::new(build_command_good) as CommandBuilder,
                                                             connection_state,
                                                         ))),
                                                         _ => future::err((

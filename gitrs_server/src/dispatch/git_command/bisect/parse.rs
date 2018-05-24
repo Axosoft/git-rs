@@ -9,14 +9,14 @@ pub struct BisectStep {
 }
 
 #[derive(Debug, Serialize)]
-pub struct BisectSuccess {
+pub struct BisectFinish {
     bad_commit_sha: String,
 }
 
 #[derive(Debug, Serialize)]
 pub enum BisectOutput {
     Step(BisectStep),
-    Success(BisectSuccess),
+    Finish(BisectFinish),
 }
 
 named!(parse_bisect_step<&str, BisectStep>,
@@ -38,10 +38,10 @@ named!(parse_bisect_step<&str, BisectStep>,
     )
 );
 
-named!(parse_bisect_success<&str, BisectSuccess>,
+named!(parse_bisect_success<&str, BisectFinish>,
     do_parse!(
         bad_commit_sha: sha >>
-        (BisectSuccess {
+        (BisectFinish {
             bad_commit_sha: String::from(bad_commit_sha),
         })
     )
@@ -50,6 +50,6 @@ named!(parse_bisect_success<&str, BisectSuccess>,
 named!(pub parse_bisect<&str, BisectOutput>,
     switch!(opt!(tag!("Bisecting: ")),
         Some("Bisecting: ") => dbg!(map!(call!(parse_bisect_step), BisectOutput::Step)) |
-        None => map!(call!(parse_bisect_success), BisectOutput::Success)
+        None => map!(call!(parse_bisect_success), BisectOutput::Finish)
     )
 );
