@@ -30,7 +30,7 @@ pub struct LogEntry {
     summary: String,
 }
 
-named!(pub parse_parent_entries<&str, Vec<String>>, 
+named!(pub parse_parent_entries<&str, Vec<String>>,
     switch!(peek!(take!(1)),
         "\n" => value!(Vec::new()) |
         _ => separated_list!(

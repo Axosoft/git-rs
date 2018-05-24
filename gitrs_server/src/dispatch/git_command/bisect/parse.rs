@@ -8,20 +8,48 @@ pub struct BisectStep {
     num_steps_left: u32,
 }
 
-named!(pub parse_bisect_step<&str, BisectStep>,
+#[derive(Debug, Serialize)]
+pub struct BisectSuccess {
+    bad_commit_sha: String,
+}
+
+#[derive(Debug, Serialize)]
+pub enum BisectOutput {
+    Step(BisectStep),
+    Success(BisectSuccess),
+}
+
+named!(parse_bisect_step<&str, BisectStep>,
     do_parse!(
-        tag!("Bisecting: ") >>
         num_revisions_left: digit1 >>
         tag!(" revision") >>
         opt!(char!('s')) >>
-        tag!("left to test after this (roughly ") >>
+        tag!(" left to test after this (roughly ") >>
         num_steps_left: digit1 >>
-        tag!(" steps)\n[") >>
+        tag!(" step") >>
+        opt!(char!('s')) >>
+        tag!(")\n[") >>
         current_commit_sha: sha >>
         (BisectStep {
             current_commit_sha: String::from(current_commit_sha),
             num_revisions_left: parse_u32(num_revisions_left, 10),
             num_steps_left: parse_u32(num_steps_left, 10),
         })
+    )
+);
+
+named!(parse_bisect_success<&str, BisectSuccess>,
+    do_parse!(
+        bad_commit_sha: sha >>
+        (BisectSuccess {
+            bad_commit_sha: String::from(bad_commit_sha),
+        })
+    )
+);
+
+named!(pub parse_bisect<&str, BisectOutput>,
+    switch!(opt!(tag!("Bisecting: ")),
+        Some("Bisecting: ") => dbg!(map!(call!(parse_bisect_step), BisectOutput::Step)) |
+        None => map!(call!(parse_bisect_success), BisectOutput::Success)
     )
 );

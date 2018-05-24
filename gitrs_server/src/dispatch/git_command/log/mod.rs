@@ -38,7 +38,7 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                         Ok(output) => future::ok((String::from(output), connection_state)),
                         Err(_) => future::err((Error::Process(Encoding), connection_state)),
                     },
-                      Err(_) => future::err((Error::Process(Failed), connection_state))
+                    Err(_) => future::err((Error::Process(Failed), connection_state)),
                 })
                 .and_then(|(result, connection_state)| -> DispatchFuture {
                     if result.len() == 0 {
