@@ -21,9 +21,13 @@ pub struct BodyInfo {
 
 #[derive(Debug, Serialize)]
 pub struct LogEntry {
-    tree: TreeInfo,
-    signature: SignatureInfo,
-    body: BodyInfo,
+    author: String,
+    date: String,
+    description: String,
+    email: String,
+    parents: Vec<String>,
+    sha: String,
+    summary: String,
 }
 
 named!(pub parse_parent_entries<&str, Vec<String>>, 
@@ -86,13 +90,17 @@ named!(pub parse_body<&str, BodyInfo>,
 
 named!(pub parse_log_entry<&str, LogEntry>,
     do_parse!(
-        tree: parse_tree >>
-        signature: parse_signature >>
-        body: parse_body >>
+        tree_info: parse_tree >>
+        signature_info: parse_signature >>
+        body_info: parse_body >>
         (LogEntry {
-            tree: tree,
-            signature: signature,
-            body: body,
+            author: signature_info.author,
+            date: signature_info.date,
+            description: body_info.description,
+            email: signature_info.email,
+            parents: tree_info.parents,
+            sha: tree_info.sha,
+            summary: body_info.summary,
         })
     )
 );
