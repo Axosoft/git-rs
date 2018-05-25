@@ -9,14 +9,32 @@ pub struct BisectStep {
 }
 
 #[derive(Debug, Serialize)]
-pub struct BisectFinish {
+pub struct BisectReachedMergeBase {
+    merge_base_sha: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BisectFoundRange {
+    bad_commit_sha: String,
+    good_commit_sha: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BisectFoundSingle {
     bad_commit_sha: String,
 }
 
 #[derive(Debug, Serialize)]
+pub enum BisectFinish {
+    FoundRange(BisectFoundRange),
+    FoundSingle(BisectFoundSingle),
+}
+
+#[derive(Debug, Serialize)]
 pub enum BisectOutput {
-    Step(BisectStep),
     Finish(BisectFinish),
+    ReachedMergeBase(BisectReachedMergeBase),
+    Step(BisectStep),
 }
 
 named!(parse_bisect_step<&str, BisectStep>,
@@ -38,10 +56,35 @@ named!(parse_bisect_step<&str, BisectStep>,
     )
 );
 
-named!(parse_bisect_success<&str, BisectFinish>,
+named!(parse_bisect_reached_merge_base<&str, BisectReachedMergeBase>,
+    do_parse!(
+        tag!("a merge base must be tested\n[") >>
+        merge_base_sha: sha >>
+        (BisectReachedMergeBase {
+            merge_base_sha: String::from(merge_base_sha),
+        })
+    )
+);
+
+named!(parse_bisect_found_range<&str, BisectFoundRange>,
+    do_parse!(
+        tag!("merge base ") >>
+        sha >>
+        tag!(" is bad.\nThis means the bug has been fixed between ") >>
+        bad_commit_sha: sha >>
+        tag!(" and [") >>
+        good_commit_sha: sha >>
+        (BisectFoundRange {
+            bad_commit_sha: String::from(bad_commit_sha),
+            good_commit_sha: String::from(good_commit_sha),
+        })
+    )
+);
+
+named!(parse_bisect_found_single<&str, BisectFoundSingle>,
     do_parse!(
         bad_commit_sha: sha >>
-        (BisectFinish {
+        (BisectFoundSingle {
             bad_commit_sha: String::from(bad_commit_sha),
         })
     )
@@ -49,7 +92,23 @@ named!(parse_bisect_success<&str, BisectFinish>,
 
 named!(pub parse_bisect<&str, BisectOutput>,
     switch!(opt!(tag!("Bisecting: ")),
-        Some("Bisecting: ") => dbg!(map!(call!(parse_bisect_step), BisectOutput::Step)) |
-        None => map!(call!(parse_bisect_success), BisectOutput::Finish)
+        Some("Bisecting: ") => alt!(
+            map!(call!(parse_bisect_step), BisectOutput::Step) |
+            map!(call!(parse_bisect_reached_merge_base), BisectOutput::ReachedMergeBase)
+        ) |
+        None => switch!(opt!(tag!("The ")),
+            Some("The ") => map!(
+                call!(parse_bisect_found_range),
+                { |bisect_found_range| {
+                   BisectOutput::Finish(BisectFinish::FoundRange(bisect_found_range))
+                } }
+            ) |
+            None => map!(
+                call!(parse_bisect_found_single),
+                { |bisect_found_single| {
+                    BisectOutput::Finish(BisectFinish::FoundSingle(bisect_found_single))
+                } }
+            )
+        )
     )
 );

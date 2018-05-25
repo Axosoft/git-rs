@@ -1,6 +1,6 @@
 mod parse;
 
-use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectStep};
+use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep};
 use error::protocol::SubhandlerError;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
@@ -17,7 +17,7 @@ macro_rules! enclose {
     (($($x:ident),*) $y:expr) => {
         {
             $(let $x = $x.clone();)*
-                $y
+            $y
         }
     };
 }
@@ -39,9 +39,10 @@ enum BisectError {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 enum OutboundMessage {
-    Step(BisectStep),
     Error(BisectError),
     Finish(BisectFinish),
+    ReachedMergeBase(BisectReachedMergeBase),
+    Step(BisectStep),
     Success,
 }
 
@@ -64,7 +65,12 @@ fn run_command(build_command: CommandBuilder) -> impl Future<Item = String, Erro
         .output_async()
         .map_err(|_| SubhandlerError::Shared(Process(Failed)))
         .and_then(|output| {
-            str::from_utf8(&output.stdout)
+            let output = if output.stdout.is_empty() {
+                output.stderr
+            } else {
+                output.stdout
+            };
+            str::from_utf8(&output)
                 .map(String::from)
                 .map_err(|_| SubhandlerError::Shared(Process(Encoding)))
         })
@@ -97,16 +103,13 @@ fn handle_errors((err, connection_state): (SubhandlerError<BisectError>, state::
 
 type LoopFuture = Box<
     Future<
-        Item = Loop<state::Connection, (CommandBuilder, state::Connection)>,
-        Error = (SubhandlerError<BisectError>, state::Connection)
-    > + Send
+            Item = Loop<state::Connection, (CommandBuilder, state::Connection)>,
+            Error = (SubhandlerError<BisectError>, state::Connection),
+        >
+        + Send,
 >;
 
-fn build_bisect_step_handler(
-    repo_path: String,
-) -> impl FnOnce(
-    (String, state::Connection)
-) -> LoopFuture {
+fn build_bisect_step_handler(repo_path: String) -> impl FnOnce((String, state::Connection)) -> LoopFuture {
     use error::protocol::Error::Process;
     use error::protocol::ProcessError::Parsing;
 
@@ -130,6 +133,7 @@ fn build_bisect_step_handler(
 
     enclose! { (build_command_bad, build_command_good, build_command_reset)
         move |(output, connection_state): (String, state::Connection)| -> LoopFuture {
+            println!("{}", output);
             match parse_bisect(&output[..]) {
                 Ok((_, output)) => match output {
                     BisectOutput::Finish(bisect_finish) => Box::new(
@@ -140,58 +144,71 @@ fn build_bisect_step_handler(
                         )
                             .map(Loop::Break)
                     ),
-                    BisectOutput::Step(bisect_step) => Box::new(
-                        send_message(connection_state, OutboundMessage::Step(bisect_step))
-                            .map_err(|(err, connection_state)| (
-                                SubhandlerError::Shared(err),
-                                connection_state
-                            ))
-                            .and_then(|connection_state| {
-                                read_message(connection_state)
-                                    .map_err(|(err, connection_state)| (SubhandlerError::Shared(err), connection_state))
-                            })
-                            .and_then(|(message, connection_state)| -> LoopFuture {
-                                match message {
-                                    InboundMessage::Bad => Box::new(
-                                        future::ok(
-                                            Loop::Continue((
-                                                Box::new(build_command_bad) as CommandBuilder,
-                                                connection_state
-                                            ))
+                    output => {
+                        let message = match output {
+                            BisectOutput::Step(bisect_step) => OutboundMessage::Step(bisect_step),
+                            BisectOutput::ReachedMergeBase(bisect_reached_merge_base) => {
+                                OutboundMessage::ReachedMergeBase(bisect_reached_merge_base)
+                            }
+                            BisectOutput::Finish(_) => unreachable!("`Finish(_)` should have been handled by the outer `match`."),
+                        };
+
+                        Box::new(
+                            send_message(connection_state, message)
+                                .map_err(|(err, connection_state)| (
+                                    SubhandlerError::Shared(err),
+                                    connection_state
+                                ))
+                                .and_then(|connection_state| {
+                                    read_message(connection_state)
+                                        .map_err(|(err, connection_state)| (
+                                            SubhandlerError::Shared(err),
+                                            connection_state
+                                        ))
+                                })
+                                .and_then(|(message, connection_state)| -> LoopFuture {
+                                    match message {
+                                        InboundMessage::Bad => Box::new(
+                                            future::ok(
+                                                Loop::Continue((
+                                                    Box::new(build_command_bad) as CommandBuilder,
+                                                    connection_state
+                                                ))
+                                            )
+                                        ),
+                                        InboundMessage::Good => Box::new(
+                                            future::ok(
+                                                Loop::Continue((
+                                                    Box::new(build_command_good) as CommandBuilder,
+                                                    connection_state
+                                                ))
+                                            )
+                                        ),
+                                        InboundMessage::Reset => Box::new(
+                                            run_command(Box::new(build_command_reset))
+                                                .then(|result| {
+                                                    match result {
+                                                        Ok(_) => Box::new(
+                                                            send_message(
+                                                                connection_state,
+                                                                OutboundMessage::Success
+                                                            )
+                                                                .map_err(|(err, connection_state)| (
+                                                                    SubhandlerError::Shared(err),
+                                                                    connection_state
+                                                                ))
+                                                                .map(Loop::Break)
+                                                        ),
+                                                        Err(err) => Box::new(
+                                                            future::err((err, connection_state))
+                                                        ) as LoopFuture
+                                                    }
+                                                })
                                         )
-                                    ),
-                                    InboundMessage::Good => Box::new(
-                                        future::ok(
-                                            Loop::Continue((
-                                                Box::new(build_command_good) as CommandBuilder,
-                                                connection_state
-                                            ))
-                                        )
-                                    ),
-                                    InboundMessage::Reset => Box::new(
-                                        run_command(Box::new(build_command_reset))
-                                            .then(|result| {
-                                                match result {
-                                                    Ok(_) => Box::new(
-                                                        send_message(
-                                                            connection_state,
-                                                            OutboundMessage::Success
-                                                        )
-                                                            .map_err(|(err, connection_state)| (
-                                                                SubhandlerError::Shared(err),
-                                                                connection_state
-                                                            ))
-                                                            .map(Loop::Break)
-                                                    ),
-                                                    Err(err) => Box::new(
-                                                        future::err((err, connection_state))
-                                                    ) as LoopFuture
-                                                }
-                                            })
-                                    )
-                                }
-                            })
-                    )
+                                    }
+                                })
+                        )
+                    },
                 },
                 Err(_) => Box::new(future::err((SubhandlerError::Shared(Process(Parsing)), connection_state))),
             }
@@ -222,7 +239,7 @@ pub fn dispatch(connection_state: state::Connection, bad: String, good: String) 
                     move |(build_command, connection_state)| {
                         run_command(build_command)
                             .then(|result| match result {
-                                Ok(stdout) => future::ok((stdout, connection_state)),
+                                Ok(output) => future::ok((output, connection_state)),
                                 Err(err) => future::err((err, connection_state)),
                             })
                             .and_then(build_bisect_step_handler(repo_path.clone()))
