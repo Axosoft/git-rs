@@ -399,7 +399,9 @@ impl StagedStatusEntry {
         })
     }
 
-    fn from_copied_or_renamed_status_entry(entry: &CopiedOrRenamedStatusEntry) -> Option<StatusEntryOutput> {
+    fn from_copied_or_renamed_status_entry(
+        entry: &CopiedOrRenamedStatusEntry,
+    ) -> Option<StatusEntryOutput> {
         entry.staged_status.as_ref().map(|status| {
             StatusEntryOutput::Staged(Self {
                 file_mode: entry.file_mode.index.clone(),
@@ -440,7 +442,9 @@ impl UnstagedStatusEntry {
         })
     }
 
-    fn from_copied_or_renamed_status_entry(entry: &CopiedOrRenamedStatusEntry) -> Option<StatusEntryOutput> {
+    fn from_copied_or_renamed_status_entry(
+        entry: &CopiedOrRenamedStatusEntry,
+    ) -> Option<StatusEntryOutput> {
         entry.unstaged_status.as_ref().map(|status| {
             StatusEntryOutput::Unstaged(Self {
                 file_mode: Some(entry.file_mode.worktree.clone()),
@@ -500,9 +504,9 @@ pub fn build_git_status_output(entries: Vec<StatusEntry>) -> StatusResult {
                 StatusEntry::UnmergedStatusEntry(entry) => {
                     vec![Some(ConflictStatusEntry::from_unmerged_status_entry(entry))]
                 }
-                StatusEntry::UntrackedStatusEntry(entry) => {
-                    vec![Some(UnstagedStatusEntry::from_untracked_status_entry(entry))]
-                }
+                StatusEntry::UntrackedStatusEntry(entry) => vec![
+                    Some(UnstagedStatusEntry::from_untracked_status_entry(entry)),
+                ],
                 StatusEntry::IgnoredStatusEntry(entry) => {
                     // this is not ideal
                     vec![Some(StatusEntryOutput::Ignored(entry.clone()))]

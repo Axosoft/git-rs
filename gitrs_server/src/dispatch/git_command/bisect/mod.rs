@@ -1,6 +1,7 @@
 mod parse;
 
-use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep};
+use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep,
+                  BisectVisualize};
 use error::protocol::SubhandlerError;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
@@ -28,6 +29,7 @@ enum InboundMessage {
     Bad,
     Good,
     Reset,
+    Visualize,
 }
 
 #[derive(Debug, Serialize)]
@@ -43,6 +45,7 @@ enum OutboundMessage {
     Finish(BisectFinish),
     ReachedMergeBase(BisectReachedMergeBase),
     Step(BisectStep),
+    Visualize(BisectVisualize),
     Success,
 }
 
@@ -57,7 +60,9 @@ fn verify_repo_path(repo_path: Option<String>) -> Result<String, SubhandlerError
     }
 }
 
-fn run_command(build_command: CommandBuilder) -> impl Future<Item = String, Error = SubhandlerError<BisectError>> {
+fn run_command(
+    build_command: CommandBuilder,
+) -> impl Future<Item = String, Error = SubhandlerError<BisectError>> {
     use error::protocol::Error::Process;
     use error::protocol::ProcessError::{Encoding, Failed};
 
@@ -76,25 +81,32 @@ fn run_command(build_command: CommandBuilder) -> impl Future<Item = String, Erro
         })
 }
 
+type FinishBisectError = (SubhandlerError<BisectError>, state::Connection);
+
 fn finish_bisect(
     bisect_finish: BisectFinish,
     build_command_reset: CommandBuilder,
     connection_state: state::Connection,
-) -> impl Future<Item = state::Connection, Error = (SubhandlerError<BisectError>, state::Connection)> {
+) -> impl Future<Item = state::Connection, Error = FinishBisectError> {
     run_command(build_command_reset).then(|result| -> Box<Future<Item = _, Error = _> + Send> {
         match result {
             Ok(_) => Box::new(
-                send_message(connection_state, OutboundMessage::Finish(bisect_finish))
-                    .map_err(|(err, connection_state)| (SubhandlerError::Shared(err), connection_state)),
+                send_message(connection_state, OutboundMessage::Finish(bisect_finish)).map_err(
+                    |(err, connection_state)| (SubhandlerError::Shared(err), connection_state),
+                ),
             ),
             Err(err) => Box::new(future::err((err, connection_state))),
         }
     })
 }
 
-fn handle_errors((err, connection_state): (SubhandlerError<BisectError>, state::Connection)) -> DispatchFuture {
+fn handle_errors(
+    (err, connection_state): (SubhandlerError<BisectError>, state::Connection),
+) -> DispatchFuture {
     match err {
-        SubhandlerError::Shared(err) => Box::new(future::err((err, connection_state))) as DispatchFuture,
+        SubhandlerError::Shared(err) => {
+            Box::new(future::err((err, connection_state))) as DispatchFuture
+        }
         SubhandlerError::Subhandler(err) => {
             Box::new(send_message(connection_state, OutboundMessage::Error(err))) as DispatchFuture
         }
@@ -109,7 +121,9 @@ type LoopFuture = Box<
         + Send,
 >;
 
-fn build_bisect_step_handler(repo_path: String) -> impl FnOnce((String, state::Connection)) -> LoopFuture {
+fn build_bisect_step_handler(
+    repo_path: String,
+) -> impl FnOnce((String, state::Connection)) -> LoopFuture {
     use error::protocol::Error::Process;
     use error::protocol::ProcessError::Parsing;
 
@@ -131,7 +145,13 @@ fn build_bisect_step_handler(repo_path: String) -> impl FnOnce((String, state::C
         command
     }};
 
-    enclose! { (build_command_bad, build_command_good, build_command_reset)
+    let build_command_visualize = enclose! { (repo_path) move || {
+        let mut command = git::new_command_with_repo_path(&repo_path);
+        command.arg("bisect").arg("visualize").arg("--format=sha %H");
+        command
+    }};
+
+    enclose! { (build_command_bad, build_command_good, build_command_reset, build_command_visualize)
         move |(output, connection_state): (String, state::Connection)| -> LoopFuture {
             println!("{}", output);
             match parse_bisect(&output[..]) {
@@ -149,7 +169,10 @@ fn build_bisect_step_handler(repo_path: String) -> impl FnOnce((String, state::C
                             BisectOutput::Step(bisect_step) => OutboundMessage::Step(bisect_step),
                             BisectOutput::ReachedMergeBase(bisect_reached_merge_base) => {
                                 OutboundMessage::ReachedMergeBase(bisect_reached_merge_base)
-                            }
+                            },
+                            BisectOutput::Visualize(bisect_visualize) => {
+                                OutboundMessage::Visualize(bisect_visualize)
+                            },
                             BisectOutput::Finish(_) => unreachable!("`Finish(_)` should have been handled by the outer `match`."),
                         };
 
@@ -204,13 +227,25 @@ fn build_bisect_step_handler(repo_path: String) -> impl FnOnce((String, state::C
                                                         ) as LoopFuture
                                                     }
                                                 })
-                                        )
+                                        ),
+                                        InboundMessage::Visualize => Box::new(
+                                            future::ok(
+                                                Loop::Continue((
+                                                    Box::new(
+                                                        build_command_visualize
+                                                    ) as CommandBuilder,
+                                                    connection_state
+                                                ))
+                                            )
+                                        ),
                                     }
                                 })
                         )
                     },
                 },
-                Err(_) => Box::new(future::err((SubhandlerError::Shared(Process(Parsing)), connection_state))),
+                Err(_) => Box::new(
+                    future::err((SubhandlerError::Shared(Process(Parsing)), connection_state))
+                ),
             }
         }
     }

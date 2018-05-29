@@ -29,7 +29,8 @@ pub fn main() {
     let server_address = String::from("0.0.0.0:5134")
         .parse()
         .expect("Server address could not be parsed!");
-    let listener = TcpListener::bind(&server_address).expect("TCP listener could not be bound to address!");
+    let listener =
+        TcpListener::bind(&server_address).expect("TCP listener could not be bound to address!");
     let server = listener
         .incoming()
         .for_each(move |socket| {

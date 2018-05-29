@@ -31,10 +31,16 @@ pub enum BisectFinish {
 }
 
 #[derive(Debug, Serialize)]
+pub struct BisectVisualize {
+    shas: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
 pub enum BisectOutput {
     Finish(BisectFinish),
     ReachedMergeBase(BisectReachedMergeBase),
     Step(BisectStep),
+    Visualize(BisectVisualize),
 }
 
 named!(parse_bisect_step<&str, BisectStep>,
@@ -90,6 +96,13 @@ named!(parse_bisect_found_single<&str, BisectFoundSingle>,
     )
 );
 
+named!(parse_bisect_visualize<&str, Vec<String>>,
+    separated_list!(
+        char!('\n'),
+        complete!(do_parse!(tag!("sha ") >> sha: sha >> (String::from(sha))))
+    )
+);
+
 named!(pub parse_bisect<&str, BisectOutput>,
     switch!(opt!(tag!("Bisecting: ")),
         Some("Bisecting: ") => alt!(
@@ -103,11 +116,17 @@ named!(pub parse_bisect<&str, BisectOutput>,
                    BisectOutput::Finish(BisectFinish::FoundRange(bisect_found_range))
                 } }
             ) |
-            None => map!(
-                call!(parse_bisect_found_single),
-                { |bisect_found_single| {
-                    BisectOutput::Finish(BisectFinish::FoundSingle(bisect_found_single))
-                } }
+            None => switch!(opt!(peek!(tag!("sha "))),
+                Some("sha ") => map!(
+                    call!(parse_bisect_visualize),
+                    { |shas| BisectOutput::Visualize(BisectVisualize { shas }) }
+                ) |
+                None => map!(
+                    call!(parse_bisect_found_single),
+                    { |bisect_found_single| {
+                        BisectOutput::Finish(BisectFinish::FoundSingle(bisect_found_single))
+                    } }
+                )
             )
         )
     )
