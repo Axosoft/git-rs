@@ -2,7 +2,7 @@ mod parse;
 
 use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep,
                   BisectVisualize};
-use error::protocol::SubhandlerError;
+use error::protocol::{Error, SubhandlerError};
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
 use state;
@@ -35,6 +35,7 @@ enum InboundMessage {
 #[derive(Debug, Serialize)]
 #[serde(tag = "reason")]
 enum BisectError {
+    AlreadyBisecting,
     RepoPathNotSet,
 }
 
@@ -105,10 +106,10 @@ fn handle_errors(
 ) -> DispatchFuture {
     match err {
         SubhandlerError::Shared(err) => {
-            Box::new(future::err((err, connection_state))) as DispatchFuture
+            Box::new(future::err((err, connection_state)))
         }
         SubhandlerError::Subhandler(err) => {
-            Box::new(send_message(connection_state, OutboundMessage::Error(err))) as DispatchFuture
+            Box::new(send_message(connection_state, OutboundMessage::Error(err)))
         }
     }
 }
@@ -252,11 +253,42 @@ fn build_bisect_step_handler(
 }
 
 pub fn dispatch(connection_state: state::Connection, bad: String, good: String) -> DispatchFuture {
+    use error::protocol::Error::Process;
+    use error::protocol::ProcessError::Failed;
+    use self::BisectError::AlreadyBisecting;
+
     Box::new(
         future::result(match verify_repo_path(connection_state.repo_path.clone()) {
             Ok(repo_path) => Ok((repo_path, connection_state)),
             Err(err) => Err((err, connection_state)),
-        }).and_then(move |(repo_path, connection_state)| {
+        })
+        .and_then(move |(repo_path, connection_state)| {
+            git::new_command_with_repo_path(&repo_path)
+                .arg("bisect")
+                .arg("log")
+                .output_async()
+                .then(|output| match output {
+                    Ok(output) => match output.status.code() {
+                        Some(status) => if status == 0 {
+                            Box::new(future::err((
+                                SubhandlerError::Subhandler(AlreadyBisecting),
+                                connection_state
+                            )))
+                        } else {
+                            Box::new(future::ok((repo_path, connection_state)))
+                        },
+                        None => Box::new(future::err((
+                            SubhandlerError::Shared(Process(Failed)),
+                            connection_state
+                        )))
+                    },
+                    Err(_) => Box::new(future::err((
+                        SubhandlerError::Shared(Process(Failed)),
+                        connection_state
+                    )))
+                })
+        })
+        .and_then(move |(repo_path, connection_state)| {
             let build_command_start: CommandBuilder = Box::new(enclose! { (repo_path) move || {
                 let mut command = git::new_command_with_repo_path(&repo_path);
                 command
