@@ -116,7 +116,7 @@ named!(pub parse_log_entries<&str, Vec<LogEntry>>,
 );
 
 pub fn parse_log(input: &str) -> Result<Vec<LogEntry>, Error> {
-    let mut input = String::from(input);
+    let input = String::from(input);
 
     parse_log_entries(&input)
         .map_err(|_| Error::Process(Parsing))
