@@ -17,6 +17,7 @@ extern crate tokio_process;
 extern crate uuid;
 
 mod config;
+mod constants;
 mod dispatch;
 mod error;
 mod message;
@@ -27,6 +28,7 @@ mod util;
 use clap::{App, Arg};
 use dispatch::init_dispatch;
 use std::path::Path;
+use std::process;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::prelude::*;
@@ -56,16 +58,13 @@ pub fn main() {
                 .short("g")
                 .long("git-path")
                 .value_name("GIT_PATH")
-                .help("Sets the location of the Git binary. If it is not set, path is assumed.")
+                .help("Sets the location of the parent folder for Git binary. Will take precedence over existing system Git executable.")
                 .takes_value(true)
                 .validator(|maybe_path| {
-                    let path = Path::new(&maybe_path);
-                    if path.is_relative() {
-                        Err(String::from("Must be an absolute path to git binary!"))
-                    } else if path.is_file() {
-                        Ok(())
+                    if Path::new(&maybe_path).is_relative() {
+                        Err(String::from("Must be an absolute path to parent folder of Git binary!"))
                     } else {
-                        Err(String::from("Provided path does not exist!"))
+                        Ok(())
                     }
                 }),
         )
@@ -81,8 +80,15 @@ pub fn main() {
         let mut config = config::CONFIG.write().unwrap();
         matches
             .value_of("git-path")
-            .map(|git_path| config.git_path.set(String::from(git_path)));
+            .map(|maybe_path| {
+                if Path::new(&maybe_path).is_dir() {
+                    config.git_path = Some(String::from(maybe_path));
+                } else {
+                    process::exit(constants::exit_code::ENOENT);
+                }
+            });
         if matches.is_present("port") {
+            // failure case should never happen because we have already validated the port.
             config.port = value_t!(matches.value_of("port"), u32).unwrap_or_else(|e| e.exit());
         }
         config.debug = matches.is_present("debug");
@@ -91,9 +97,15 @@ pub fn main() {
     let state = Arc::new(Mutex::new(state::Shared::new()));
     let server_address = String::from(format!("0.0.0.0:{:?}", config::CONFIG.read().unwrap().port))
         .parse()
-        .expect("Server address could not be parsed!");
+        .unwrap_or_else(|_| process::exit(constants::exit_code::EFAULT));
+
     let listener =
-        TcpListener::bind(&server_address).expect("TCP listener could not be bound to address!");
+        TcpListener::bind(&server_address)
+            .unwrap_or_else(|_| {
+                println!("TCP listener could not be bound to address!");
+                process::exit(constants::exit_code::EADDRINUSE);
+            });
+
     let server = listener
         .incoming()
         .for_each(move |socket| {
@@ -109,8 +121,6 @@ pub fn main() {
             }
         });
 
-    if config::CONFIG.read().unwrap().debug {
-        println!("server running on {}", server_address);
-    }
+    println!("{:?}", config::CONFIG.read().unwrap().port);
     tokio::run(server);
 }

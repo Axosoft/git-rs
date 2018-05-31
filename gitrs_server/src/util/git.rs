@@ -1,8 +1,26 @@
 use config;
+use constants;
+use std::env;
 use std::process::Command;
 
 pub fn new_command() -> Command {
-    let mut command = Command::new(config::CONFIG.read().unwrap().git_path.get());
+    let path = match config::CONFIG.read().unwrap().git_path {
+        Some(ref git_path) => {
+            let mut git_path = String::from(git_path.clone());
+            git_path.push_str(constants::platform::ENV_PATH_SEPARATOR);
+            match env::var("PATH") {
+                Ok(env_path) => {
+                    git_path.push_str(&env_path);
+                    Some(git_path)
+                },
+                Err(_) => None
+            }
+        },
+        None => None
+    };
+
+    let mut command = Command::new("git");
+    path.map(|path| { command.env("PATH", &String::from(path)); });
     command.arg("--no-pager");
     command
 }
