@@ -1,6 +1,6 @@
 [package]
 name = "git_server"
-version = "0.1.0"
+version = "0.4.0"
 authors = [
   "Tyler Wanek <tylerw@axosoft.com>",
   "Joshua Grosso <joshuag@axosoft.com>",

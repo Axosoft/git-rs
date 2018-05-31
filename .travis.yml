@@ -1,0 +1,32 @@
+language: rust
+rust:
+- stable
+script:
+  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all --target $TARGET
+cache: cargo
+matrix:
+    include:
+        - os: linux
+          env: TARGET=x86_64-unknown-linux-gnu
+        - os: osx
+          env: TARGET=x86_64-apple-darwin
+before_install:
+  - nvm install 8
+  - nvm use 8
+before_deploy:
+  - node ./ci/checkTomlSemver.js
+  - cp gitrs_server/target/$TARGET/release/git_server git_server
+  - ./ci/bundle_git.sh
+  - tar -czvf $TARGET.tar.gz vendor git_server
+after_success:
+  - node ./ci/checkIsRelease.js && DO_DEPLOY=true || true
+deploy:
+  skip_cleanup: true
+  provider: releases
+  api_key:
+    secure: BICX4doypwGv28hK+hxbtH315N+lWfPh7iBQ1wslsJm59D4HNn/GAneSlRRzQzIF12rEzSTKsCn2wFtLCx1lBtSCXRz48Vt+td4iZMs9PhyfYEVoJ9mfDrkT/eKvtBVsqlGmyjjpr6Mxeyy++HE2+bDQK0Vz1qDlwrCsCh3Sz1UYCphAvoxHv3Zf58a4pV7gKyoa7JFSoRD7U+2JtxPM/RUItSFahMO6a2bP0eqPusHnTggwz8a3XhQHu694/fpVEK9IwTM0sA5E/f1J32FdLwP+B5B3hgrEfymYnof2SM2IWObEVfq9JpfI6Q3JUkevMbIxkXh5qXnWWmqRYLyK6nfv6DOpw8pniBwA6cktjcEz1mOqLiRDg8dv/4dv3BYoDUjDkITECzKdjbL/1pXTGZb9atBR3O1ggJZY5j2KTxUaX1Yohdrad7/2rVQTOIWU9aCyUcFj3xgVxqFga/aMp/56uWe6h8lrSxtL6QJpZkD7IpkT1aVJINPgGwOk/4MHnl2YX9BwQqUaW3dijXA20j5LoldpXIm9JYSPXiwfgPvdpdhrUNkGnfDTnjCVm7fsOoV6L1PIlmV3uc/w7TabGLFPFOiZhYY/WZyLZh+kiTWcWT65qYL49HqCWvu8bEZ/QNFQr+aNu/nEC1NHtLISr/Qdy33N05wfzf/+ctTKoPA=
+  file: $TARGET.tar.gz
+  on:
+    repo: stevek-axo/git-rs
+    tags: true
+    condition: $DO_DEPLOY
