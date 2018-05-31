@@ -13,7 +13,8 @@ const config = {
   gitRsBinaryPath: '',
   source: '',
   target: process.env.TARGET,
-  vendorDirectory: path.join(process.cwd(), 'build', 'vendor')
+  tempFile: '',
+  vendorDirectory: ''
 };
 
 switch (process.env.TARGET) {
@@ -64,6 +65,13 @@ const packBundle = async (sourcePaths, destinationFile) => tar.create(
 
 
 const bundleGit = (config) => {
+  mkdirp(config.buildDirectory, (error) => {
+    if (error) {
+      console.log(`Could not create build directory`);
+      process.exit(1);
+    }
+  });
+
   const options = {
     url: config.source
   };
