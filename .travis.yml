@@ -13,6 +13,7 @@ matrix:
 before_install:
   - nvm install 8
   - nvm use 8
+  - npm i -g npm@6.1.0 
   - npm ci --prefix ./ci
 before_deploy:
   - node ./ci/checkTomlSemver.js
