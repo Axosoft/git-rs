@@ -19,12 +19,11 @@ after_test:
   - node .\ci\checkIsRelease.js && set "DO_DEPLOY=true" || exit 0
 
 build_script:
-  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all --target %TARGET%
+  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all
 
 before_deploy:
   - node .\ci\checkTomlSemver.js
-  - copy gitrs_server\target\%TARGET%\release\git_server.exe git_server.exe
-  - ps: .\ci\bundle_git.ps1
+  - node .\ci\buildRelease.js
   - appveyor PushArtifact %TARGET%.tar.gz
   
 deploy:

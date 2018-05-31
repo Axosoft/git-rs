@@ -2,7 +2,7 @@ language: rust
 rust:
 - stable
 script:
-  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all --target $TARGET
+  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all
 cache: cargo
 matrix:
     include:
@@ -15,9 +15,7 @@ before_install:
   - nvm use 8
 before_deploy:
   - node ./ci/checkTomlSemver.js
-  - cp gitrs_server/target/$TARGET/release/git_server git_server
-  - ./ci/bundle_git.sh
-  - tar -czvf $TARGET.tar.gz vendor git_server
+  - node ./ci/buildRelease.js
 after_success:
   - node ./ci/checkIsRelease.js && DO_DEPLOY=true || true
 deploy:
