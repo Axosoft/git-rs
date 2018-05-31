@@ -2,6 +2,7 @@ mod dispatch;
 mod git_command;
 
 use self::dispatch::dispatch;
+use config;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
 use semver::Version;
@@ -38,7 +39,9 @@ pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
             version: Version::new(0, 1, 0),
         },
     ).and_then(|connection_state| {
-        println!("wrote hello message");
+        if config::CONFIG.read().unwrap().debug {
+            println!("wrote hello message");
+        }
         read_validated_message!(Inbound::Hello, connection_state)
     })
         .and_then(|(_, connection_state)| send_message(connection_state, Outbound::GladToMeetYou))
@@ -63,7 +66,11 @@ pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
         })
         .and_then(|transport| send_message(transport, Outbound::Goodbye { error_code: None }))
         .and_then(|_| Ok(()))
-        .map_err(|(err, _connection_state)| println!("error; err={:?}", err));
+        .map_err(|(err, _connection_state)| {
+            if config::CONFIG.read().unwrap().debug {
+                println!("error; err={:?}", err)
+            }
+        });
 
     tokio::spawn(connection);
 }

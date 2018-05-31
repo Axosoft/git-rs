@@ -1,4 +1,5 @@
 use bytes::{Bytes, BytesMut};
+use config;
 use error;
 use futures::future::{self, Future};
 use futures::{Sink, Stream};
@@ -49,11 +50,15 @@ where
                     Some(x) => x,
                     None => unimplemented!(),
                 };
-                println!("received message; message={:?}", response);
+                if config::CONFIG.read().unwrap().debug {
+                    println!("received message; message={:?}", response);
+                }
                 connection_state.transport = Some(transport);
                 match deserialize(&response) {
                     Ok(message) => {
-                        println!("deserialized message; message={:?}", message);
+                        if config::CONFIG.read().unwrap().debug {
+                            println!("deserialized message; message={:?}", message);
+                        }
                         future::ok((message, connection_state))
                     }
                     Err(err) => future::err((err, connection_state)),

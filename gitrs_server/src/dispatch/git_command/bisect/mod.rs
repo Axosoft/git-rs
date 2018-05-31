@@ -2,6 +2,7 @@ mod parse;
 
 use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep,
                   BisectVisualize};
+use config;
 use error::protocol::SubhandlerError;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
@@ -152,7 +153,9 @@ fn build_bisect_step_handler(
 
     enclose! { (build_command_bad, build_command_good, build_command_reset, build_command_visualize)
         move |(output, connection_state): (String, state::Connection)| -> LoopFuture {
-            println!("{}", output);
+            if config::CONFIG.read().unwrap().debug {
+                println!("{}", output);
+            }
             match parse_bisect(&output[..]) {
                 Ok((_, output)) => match output {
                     BisectOutput::Finish(bisect_finish) => Box::new(
