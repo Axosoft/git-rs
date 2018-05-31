@@ -26,25 +26,21 @@ pub fn dispatch(
     ancestor_sha: String,
     descendant_sha: String,
 ) -> DispatchFuture {
-    use self::ErrorReason::{
-        AncestorMustBeASha,
-        DescendantMustBeASha,
-        RepoPathNotSet,
-        ShaIsNotACommit
-    };
+    use self::ErrorReason::{AncestorMustBeASha, DescendantMustBeASha, RepoPathNotSet,
+                            ShaIsNotACommit};
     use error::protocol::{Error, ProcessError::Failed};
 
     if !git::verify_string_is_sha(&ancestor_sha) {
         return Box::new(send_message(
             connection_state,
-            OutboundMessage::Error(AncestorMustBeASha)
+            OutboundMessage::Error(AncestorMustBeASha),
         ));
     }
 
     if !git::verify_string_is_sha(&descendant_sha) {
         return Box::new(send_message(
             connection_state,
-            OutboundMessage::Error(DescendantMustBeASha)
+            OutboundMessage::Error(DescendantMustBeASha),
         ));
     }
 
@@ -76,7 +72,7 @@ pub fn dispatch(
         ),
         None => Box::new(send_message(
             connection_state,
-            OutboundMessage::Error(RepoPathNotSet)
-        ))
+            OutboundMessage::Error(RepoPathNotSet),
+        )),
     }
 }

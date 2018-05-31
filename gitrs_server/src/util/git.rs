@@ -1,7 +1,8 @@
+use config;
 use std::process::Command;
 
 pub fn new_command() -> Command {
-    let mut command = Command::new("git");
+    let mut command = Command::new(config::CONFIG.read().unwrap().git_path.get());
     command.arg("--no-pager");
     command
 }

@@ -10,7 +10,9 @@ authors = [
 
 [dependencies]
 bytes = "0.4"
+clap = "2.31"
 futures = "0.1"
+lazy_static = "1.0"
 nom = "4.0"
 semver = { version = "0.9", features = ["serde"] }
 serde = "1.0"

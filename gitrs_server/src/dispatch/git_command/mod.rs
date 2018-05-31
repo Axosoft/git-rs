@@ -17,8 +17,9 @@ pub fn dispatch(
     match message {
         Inbound::Bisect { bad, good } => bisect::dispatch(connection_state, bad, good),
         Inbound::Log => log::dispatch(connection_state),
-        Inbound::MergeBase(merge_base_arguments) =>
-            merge_base::dispatch(connection_state, merge_base_arguments),
+        Inbound::MergeBase(merge_base_arguments) => {
+            merge_base::dispatch(connection_state, merge_base_arguments)
+        }
         Inbound::OpenRepo { path } => open_repo::dispatch(connection_state, path),
         Inbound::Status => status::dispatch(connection_state),
     }

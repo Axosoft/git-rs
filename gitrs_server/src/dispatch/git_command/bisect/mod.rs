@@ -2,7 +2,7 @@ mod parse;
 
 use self::parse::{parse_bisect, BisectFinish, BisectOutput, BisectReachedMergeBase, BisectStep,
                   BisectVisualize};
-use error::protocol::{Error, SubhandlerError};
+use error::protocol::SubhandlerError;
 use futures::future;
 use futures::future::{loop_fn, Future, Loop};
 use state;
@@ -105,9 +105,7 @@ fn handle_errors(
     (err, connection_state): (SubhandlerError<BisectError>, state::Connection),
 ) -> DispatchFuture {
     match err {
-        SubhandlerError::Shared(err) => {
-            Box::new(future::err((err, connection_state)))
-        }
+        SubhandlerError::Shared(err) => Box::new(future::err((err, connection_state))),
         SubhandlerError::Subhandler(err) => {
             Box::new(send_message(connection_state, OutboundMessage::Error(err)))
         }
@@ -253,16 +251,15 @@ fn build_bisect_step_handler(
 }
 
 pub fn dispatch(connection_state: state::Connection, bad: String, good: String) -> DispatchFuture {
+    use self::BisectError::AlreadyBisecting;
     use error::protocol::Error::Process;
     use error::protocol::ProcessError::Failed;
-    use self::BisectError::AlreadyBisecting;
 
     Box::new(
         future::result(match verify_repo_path(connection_state.repo_path.clone()) {
             Ok(repo_path) => Ok((repo_path, connection_state)),
             Err(err) => Err((err, connection_state)),
-        })
-        .and_then(move |(repo_path, connection_state)| {
+        }).and_then(move |(repo_path, connection_state)| {
             git::new_command_with_repo_path(&repo_path)
                 .arg("bisect")
                 .arg("log")
@@ -272,48 +269,49 @@ pub fn dispatch(connection_state: state::Connection, bad: String, good: String) 
                         Some(status) => if status == 0 {
                             Box::new(future::err((
                                 SubhandlerError::Subhandler(AlreadyBisecting),
-                                connection_state
+                                connection_state,
                             )))
                         } else {
                             Box::new(future::ok((repo_path, connection_state)))
                         },
                         None => Box::new(future::err((
                             SubhandlerError::Shared(Process(Failed)),
-                            connection_state
-                        )))
+                            connection_state,
+                        ))),
                     },
                     Err(_) => Box::new(future::err((
                         SubhandlerError::Shared(Process(Failed)),
-                        connection_state
-                    )))
+                        connection_state,
+                    ))),
                 })
         })
-        .and_then(move |(repo_path, connection_state)| {
-            let build_command_start: CommandBuilder = Box::new(enclose! { (repo_path) move || {
-                let mut command = git::new_command_with_repo_path(&repo_path);
-                command
-                    .arg("bisect")
-                    .arg("start")
-                    .arg(bad.clone())
-                    .arg(good.clone())
-                    .arg("--");
-                command
-            }});
+            .and_then(move |(repo_path, connection_state)| {
+                let build_command_start: CommandBuilder =
+                    Box::new(enclose! { (repo_path) move || {
+                        let mut command = git::new_command_with_repo_path(&repo_path);
+                        command
+                            .arg("bisect")
+                            .arg("start")
+                            .arg(bad.clone())
+                            .arg(good.clone())
+                            .arg("--");
+                        command
+                    }});
 
-            loop_fn(
-                (build_command_start, connection_state),
-                enclose! { (repo_path)
-                    move |(build_command, connection_state)| {
-                        run_command(build_command)
-                            .then(|result| match result {
-                                Ok(output) => future::ok((output, connection_state)),
-                                Err(err) => future::err((err, connection_state)),
-                            })
-                            .and_then(build_bisect_step_handler(repo_path.clone()))
-                    }
-                },
-            )
-        })
+                loop_fn(
+                    (build_command_start, connection_state),
+                    enclose! { (repo_path)
+                        move |(build_command, connection_state)| {
+                            run_command(build_command)
+                                .then(|result| match result {
+                                    Ok(output) => future::ok((output, connection_state)),
+                                    Err(err) => future::err((err, connection_state)),
+                                })
+                                .and_then(build_bisect_step_handler(repo_path.clone()))
+                        }
+                    },
+                )
+            })
             .or_else(handle_errors),
     )
 }

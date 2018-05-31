@@ -11,7 +11,9 @@ pub fn dispatch(
     use self::merge_base::Inbound;
 
     match message {
-        Inbound::IsAncestor { ancestor_sha, descendant_sha } =>
-            is_ancestor::dispatch(connection_state, ancestor_sha, descendant_sha),
+        Inbound::IsAncestor {
+            ancestor_sha,
+            descendant_sha,
+        } => is_ancestor::dispatch(connection_state, ancestor_sha, descendant_sha),
     }
 }
