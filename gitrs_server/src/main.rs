@@ -78,15 +78,13 @@ pub fn main() {
 
     {
         let mut config = config::CONFIG.write().unwrap();
-        matches
-            .value_of("git-path")
-            .map(|maybe_path| {
-                if Path::new(&maybe_path).is_dir() {
-                    config.git_path = Some(String::from(maybe_path));
-                } else {
-                    process::exit(constants::exit_code::ENOENT);
-                }
-            });
+        matches.value_of("git-path").map(|maybe_path| {
+            if Path::new(&maybe_path).is_dir() {
+                config.git_path = Some(String::from(maybe_path));
+            } else {
+                process::exit(constants::exit_code::ENOENT);
+            }
+        });
         if matches.is_present("port") {
             // failure case should never happen because we have already validated the port.
             config.port = value_t!(matches.value_of("port"), u32).unwrap_or_else(|e| e.exit());
@@ -99,12 +97,10 @@ pub fn main() {
         .parse()
         .unwrap_or_else(|_| process::exit(constants::exit_code::EFAULT));
 
-    let listener =
-        TcpListener::bind(&server_address)
-            .unwrap_or_else(|_| {
-                println!("TCP listener could not be bound to address!");
-                process::exit(constants::exit_code::EADDRINUSE);
-            });
+    let listener = TcpListener::bind(&server_address).unwrap_or_else(|_| {
+        println!("TCP listener could not be bound to address!");
+        process::exit(constants::exit_code::EADDRINUSE);
+    });
 
     let server = listener
         .incoming()

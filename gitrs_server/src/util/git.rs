@@ -12,15 +12,17 @@ pub fn new_command() -> Command {
                 Ok(env_path) => {
                     git_path.push_str(&env_path);
                     Some(git_path)
-                },
-                Err(_) => None
+                }
+                Err(_) => None,
             }
-        },
-        None => None
+        }
+        None => None,
     };
 
     let mut command = Command::new("git");
-    path.map(|path| { command.env("PATH", &String::from(path)); });
+    path.map(|path| {
+        command.env("PATH", &String::from(path));
+    });
     command.arg("--no-pager");
     command
 }
