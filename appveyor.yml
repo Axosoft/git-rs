@@ -9,6 +9,7 @@ environment:
 build: false
 install:
   - ps: Install-Product node 8 x64
+  - npm ci --prefix .\ci
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
