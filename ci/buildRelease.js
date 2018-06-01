@@ -14,7 +14,8 @@ const config = {
   source: '',
   target: process.env.TARGET,
   tempFile: '',
-  vendorDirectory: ''
+  vendorDirectoryName: 'vendor',
+  vendorDirectoryPath: ''
 };
 
 switch (process.env.TARGET) {
@@ -43,7 +44,7 @@ switch (process.env.TARGET) {
 
 config.buildDirectory = path.join(process.cwd(), 'build');
 config.gitRsBinaryPath = path.join(process.cwd(), 'gitrs_server', 'target', 'release', config.gitRsBinaryName);
-config.vendorDirectory = path.join(config.buildDirectory, 'vendor');
+config.vendorDirectoryPath = path.join(config.buildDirectory, config.vendorDirectoryName);
 config.tempFile = path.join(config.buildDirectory, 'git.tar.gz');
 
 const getFileChecksum = async (filePath) => new Promise((resolve) => {
@@ -55,17 +56,28 @@ const unpackFile = async (filePath, destinationPath) => tar.extract({
   file: filePath
 });
 
-const packBundle = async (sourcePaths, destinationFile) => tar.create(
+const packBundle = async (context, sourcePaths, destinationFile) => tar.create(
   {
-    gzip: true,
-    file: destinationFile
+    cwd: context,
+    file: destinationFile,
+    gzip: true
   },
   sourcePaths
 );
 
 
-const bundleGit = (config) => {
-  mkdirp(config.buildDirectory, (error) => {
+const bundleGit = ({
+  buildDirectory,
+  expectedChecksum,
+  gitRsBinaryName,
+  gitRsBinaryPath,
+  source,
+  target,
+  tempFile,
+  vendorDirectoryName,
+  vendorDirectoryPath
+}) => {
+  mkdirp(buildDirectory, (error) => {
     if (error) {
       console.log(`Could not create build directory`);
       process.exit(1);
@@ -73,10 +85,10 @@ const bundleGit = (config) => {
   });
 
   const options = {
-    url: config.source
+    url: source
   };
   const req = request.get(options);
-  req.pipe(fs.createWriteStream(config.tempFile));
+  req.pipe(fs.createWriteStream(tempFile));
 
   req.on('error', (error) => {
     console.log('Failed to fetch Git binaries');
@@ -85,26 +97,26 @@ const bundleGit = (config) => {
 
   req.on('response', (res) => {
     if (res.statusCode !== 200) {
-      console.log(`Non-200 response returned from ${config.source.toString()} - (${res.statusCode})`);
+      console.log(`Non-200 response returned from ${source.toString()} - (${res.statusCode})`);
       process.exit(1);
     }
   });
 
   req.on('end', async () => {
-    const checksum = await getFileChecksum(config.tempFile, config);
-    if (checksum !== config.expectedChecksum) {
-      console.log(`Checksum validation failed. Expected ${config.expectedChecksum} but got ${checksum}`);
+    const checksum = await getFileChecksum(tempFile, config);
+    if (checksum !== expectedChecksum) {
+      console.log(`Checksum validation failed. Expected ${expectedChecksum} but got ${checksum}`);
       process.exit(1);
     }
 
-    mkdirp(config.vendorDirectory, (error) => {
+    mkdirp(vendorDirectoryPath, (error) => {
       if (error) {
         console.log(`Could not create ${vendor} directory to extract files to`);
         process.exit(1);
       }
     });
 
-    fs.copyFile(config.gitRsBinaryPath, path.join(config.buildDirectory, config.gitRsBinaryName), (error) => {
+    fs.copyFile(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName), (error) => {
       if (error) {
         console.log(`Could not copy git-rs binaries`);
         process.exit(1);
@@ -112,14 +124,14 @@ const bundleGit = (config) => {
     });
 
     try {
-      await unpackFile(config.tempFile, config.vendorDirectory);
+      await unpackFile(tempFile, vendorDirectoryPath);
     } catch (error) {
       console.log('Could not extract git archive');
       process.exit(1);
     }
 
     try {
-      await packBundle([config.vendorDirectory, path.join(config.buildDirectory, config.gitRsBinaryName)], `${process.env.TARGET}.tar.gz`);
+      await packBundle(buildDirectory, [vendorDirectoryName, gitRsBinaryName], `${process.env.TARGET}.tar.gz`);
     } catch (error) {
       console.log('Could not build git-rs archive');
       console.error(error);
