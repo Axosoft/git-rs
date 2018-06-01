@@ -19,9 +19,21 @@ pub fn new_command() -> Command {
         None => None,
     };
 
+    let exec_path = match config::CONFIG.read().unwrap().exec_path {
+        Some(ref git_exec_path) => {
+            Some(String::from(git_exec_path.clone()))
+        }
+        None => None,
+    };
+
     let mut command = Command::new("git");
     path.map(|path| {
+        println!("{}", &path);
         command.env("PATH", &String::from(path));
+    });
+    exec_path.map(|exec_path| {
+        println!("{}", &exec_path);
+        command.env("GIT_EXEC_PATH", &String::from(exec_path));
     });
     command.arg("--no-pager");
     command
