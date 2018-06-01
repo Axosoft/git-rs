@@ -50,15 +50,15 @@ where
                     Some(x) => x,
                     None => unimplemented!(),
                 };
-                if config::CONFIG.read().unwrap().debug {
+                debug!({
                     println!("received message; message={:?}", response);
-                }
+                });
                 connection_state.transport = Some(transport);
                 match deserialize(&response) {
                     Ok(message) => {
-                        if config::CONFIG.read().unwrap().debug {
+                        debug!({
                             println!("deserialized message; message={:?}", message);
-                        }
+                        });
                         future::ok((message, connection_state))
                     }
                     Err(err) => future::err((err, connection_state)),

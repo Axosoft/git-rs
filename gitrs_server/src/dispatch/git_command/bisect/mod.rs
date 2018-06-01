@@ -153,9 +153,9 @@ fn build_bisect_step_handler(
 
     enclose! { (build_command_bad, build_command_good, build_command_reset, build_command_visualize)
         move |(output, connection_state): (String, state::Connection)| -> LoopFuture {
-            if config::CONFIG.read().unwrap().debug {
+            debug!({
                 println!("{}", output);
-            }
+            });
             match parse_bisect(&output[..]) {
                 Ok((_, output)) => match output {
                     BisectOutput::Finish(bisect_finish) => Box::new(

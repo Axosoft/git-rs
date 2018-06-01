@@ -16,6 +16,15 @@ extern crate tokio_io;
 extern crate tokio_process;
 extern crate uuid;
 
+#[macro_export]
+macro_rules! debug {
+    ($block:block) => {
+        if config::CONFIG.read().unwrap().debug {
+            $block
+        }
+    };
+}
+
 mod config;
 mod constants;
 mod dispatch;
@@ -98,23 +107,23 @@ pub fn main() {
         .unwrap_or_else(|_| process::exit(constants::exit_code::EFAULT));
 
     let listener = TcpListener::bind(&server_address).unwrap_or_else(|_| {
-        println!("TCP listener could not be bound to address!");
+        debug!({
+            println!("TCP listener could not be bound to address!");
+        });
         process::exit(constants::exit_code::EADDRINUSE);
     });
 
     let server = listener
         .incoming()
         .for_each(move |socket| {
-            if config::CONFIG.read().unwrap().debug {
+            debug!({
                 println!("accepted socket; addr={:?}", socket.peer_addr().unwrap());
-            }
+            });
             init_dispatch(state.clone(), socket);
             Ok(())
         })
         .map_err(|err| {
-            if config::CONFIG.read().unwrap().debug {
-                eprintln!("accept error = {:?}", err)
-            }
+            debug!({ eprintln!("accept error = {:?}", err) });
         });
 
     println!("{:?}", config::CONFIG.read().unwrap().port);
