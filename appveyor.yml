@@ -1,0 +1,37 @@
+image: Visual Studio 2013
+environment:
+  global:
+    CHANNEL: stable
+  matrix:
+    - TARGET: x86_64-pc-windows-msvc
+# Install Rust and Cargo
+# (Based on from https://github.com/rust-lang/libc/blob/master/appveyor.yml)
+build: false
+install:
+  - ps: Install-Product node 8 x64
+  - npm i -g npm@6.1.0
+  - npm ci --prefix .\ci
+  - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
+  - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
+
+after_test:
+  - node .\ci\checkIsRelease.js && set "DO_DEPLOY=true" || exit 0
+
+build_script:
+  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all
+
+before_deploy:
+  - node .\ci\checkTomlSemver.js
+  - node .\ci\buildRelease.js
+  - appveyor PushArtifact %TARGET%.tar.gz
+  
+deploy:
+  provider: GitHub
+  auth_token:
+    secure: QX2lo06wkU6C9NYtk6h8dDiXR63UADvTkcjzBqoh0UFjwZu3ubzHDPe76dWpz34Q
+  artifact: '%TARGET%.tar.gz'
+  on:
+    DO_DEPLOY: true

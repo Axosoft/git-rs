@@ -1,0 +1,10 @@
+{
+  "name": "ci",
+  "license": "MIT",
+  "dependencies": {
+    "checksum": "^0.1.1",
+    "mkdirp": "^0.5.1",
+    "request": "^2.87.0",
+    "tar": "^4.4.4"
+  }
+}

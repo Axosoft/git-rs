@@ -5,7 +5,8 @@ authors = [
   "Tyler Wanek <tylerw@axosoft.com>",
   "Joshua Grosso <joshuag@axosoft.com>",
   "Jose Garcia <joseg@axosoft.com>",
-  "Brandon Quan <brandonq@axosoft.com>"
+  "Brandon Quan <brandonq@axosoft.com>",
+  "Steve King Jr. <stevek@axosoft.com>"
 ]
 
 [dependencies]
