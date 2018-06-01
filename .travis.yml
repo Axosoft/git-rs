@@ -1,9 +1,14 @@
 language: rust
 rust:
-- stable
+  - stable
 script:
-- cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all
+  - cargo build --release --manifest-path gitrs_server/Cargo.toml --verbose --all
 cache: cargo
+branches:
+  only:
+    - development
+    - master
+    - /^\d+\.\d+\.\d+$/
 matrix:
   include:
   - os: linux
@@ -11,22 +16,22 @@ matrix:
   - os: osx
     env: TARGET=x86_64-apple-darwin
 before_install:
-- nvm install 8
-- nvm use 8
-- npm i -g npm@6.1.0
-- npm ci --prefix ./ci
+  - nvm install 8
+  - nvm use 8
+  - npm i -g npm@6.1.0
+  - npm ci --prefix ./ci
 before_deploy:
-- node ./ci/checkTomlSemver.js
-- node ./ci/buildRelease.js
+  - node ./ci/checkTomlSemver.js
+  - node ./ci/buildRelease.js
 after_success:
-- node ./ci/checkIsRelease.js && DO_DEPLOY=true || true
+  - node ./ci/checkIsRelease.js && DO_DEPLOY=true || true
 deploy:
   skip_cleanup: true
   provider: releases
   api_key:
-    secure: eALDh9y1T3WdPOekCS9yocrSohP5nxou2cfijDZgkgV7KnuB3fY01lJg0GV8+Jt7tnamgzn0PCD3dw3TYc6GdRO3vzLUcmB6F+IW/g+kucIFVfpj4cgsFTPBefHxPsmmaEa9tB3P9gObL4gz6R1UF9BrtFm4Ix+5YC9Lwe9wJNVZd/GqdbnBYjFqmCvoKJHXdu0bFB2w46ZednFuHpz7Le/5tnKpzLi7vA5FDbrhEIrFWT6NQSijJ6S/6M8e1LkLLS3+soxqwyA4i0fYEJAcqtHBfbdXXJbk8hnEY41A0Rx28hZi+JJmNAElyYBtpQp0vWJ3ZR3okbUWTrQmU6L+N+n4ninLqlAuseqPiY9dCYFZGeeN0+HwLYeSq8sc3YXRHPQKMfB5/Es1lR7tnTf76vA3eyUmADCIskn/loi7PMBxflZ2nUW4sHAuD9gg5/ikQzrk/+QxVN/CCSQix/l9lnUKfi/oHFc6KMeaUHuMgcHBia0LcdNE2nflIV1XZn08PQuycQ0qyPi5v/26tyPhQYF4pqwRlGLwoP7zwNmOCLpBw7oOJs++gFuYsXywb0SlZ26zBg7FEKVI7Q0YT4KobUq3ASDIAt1ZcL/YkSK4K0n/z3YWwWIzR76g+YVfFQ1PNZHbTmXni/eRf3bt4Pxydbq6ARO8mEmUrB5RQlvo/EA=
+    secure: Rw/IBYhS7nX1J5R4MsiH5QhDoDcfoComqo88sftS9tduS0KucCi3fHvMKfZ02eoYHOL23DwsyfpnN+zHJGtmmbwQXXe3dqj+5DcYRUdukdIlJmSl3saF+U9fkW9BCr/E/eNgrhDwDtUxo0u3CALot/UNr2JUtWxiaE/03hPB2VU5Jd7S9p4l+AyMzraIeJCGnSC7nNWLdgl1hOBxF7lIUPH7WgdHhaX4M0xuw6P0kd8i4g3vK8LJJ5NOd2M0q/2CDeym8tsU3FBf+gnf19JplYZp/KGpneiyoYFcydj2TlqCu4yqDLxrkQkCCum64tpHR1rGR9tDXJJS3roQ7A51ot0gVyt2aQvuF6Atl1+0u8xP+3jLaXSEXhRhXko3jpuJdBk3MxlRaqI8uXam5n0kBduybnmAjHDnF1Rsg/JBlWifLqbwWhS2Tgd8OA9jig6x9b6r5s0lyT0W8iQAqz+6VGH+p6a8h1mx4GXsg7eYzabbeHpjsds2QU07rlUUCUYFk96QYqv4Cu7HhGSy3yZaMnC4AqOIBl7ECt8FVh4A6EQvrV82adwF1ZVDoRfX2WThgfUd3YZs77bnF5AbbSnCnWbBXhmIBidLS0Z1Z45iHVuLRmuL95K2lHyWCV56NMRc87ck8dcu305ZwyfURGO0PbvPUAR+5DZyjdB1ZPZ7HBI=
   file: "$TARGET.tar.gz"
   on:
-    repo: stevek-axo/git-rs
+    repo: Axosoft/git-rs
     tags: true
     condition: "$DO_DEPLOY"

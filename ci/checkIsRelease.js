@@ -1,4 +1,4 @@
-const semverRegex = /^\d+\.\d+\.+\d(-RC\d+)?$/;
+const semverRegex = /^\d+\.\d+\.\d+$/;
 const tagName = process.env.TRAVIS_TAG || process.env.APPVEYOR_REPO_TAG_NAME;
 if (semverRegex.test(tagName)) {
   process.exit(0);
