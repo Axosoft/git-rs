@@ -30,7 +30,7 @@ deploy:
   provider: releases
   api_key:
     secure: Rw/IBYhS7nX1J5R4MsiH5QhDoDcfoComqo88sftS9tduS0KucCi3fHvMKfZ02eoYHOL23DwsyfpnN+zHJGtmmbwQXXe3dqj+5DcYRUdukdIlJmSl3saF+U9fkW9BCr/E/eNgrhDwDtUxo0u3CALot/UNr2JUtWxiaE/03hPB2VU5Jd7S9p4l+AyMzraIeJCGnSC7nNWLdgl1hOBxF7lIUPH7WgdHhaX4M0xuw6P0kd8i4g3vK8LJJ5NOd2M0q/2CDeym8tsU3FBf+gnf19JplYZp/KGpneiyoYFcydj2TlqCu4yqDLxrkQkCCum64tpHR1rGR9tDXJJS3roQ7A51ot0gVyt2aQvuF6Atl1+0u8xP+3jLaXSEXhRhXko3jpuJdBk3MxlRaqI8uXam5n0kBduybnmAjHDnF1Rsg/JBlWifLqbwWhS2Tgd8OA9jig6x9b6r5s0lyT0W8iQAqz+6VGH+p6a8h1mx4GXsg7eYzabbeHpjsds2QU07rlUUCUYFk96QYqv4Cu7HhGSy3yZaMnC4AqOIBl7ECt8FVh4A6EQvrV82adwF1ZVDoRfX2WThgfUd3YZs77bnF5AbbSnCnWbBXhmIBidLS0Z1Z45iHVuLRmuL95K2lHyWCV56NMRc87ck8dcu305ZwyfURGO0PbvPUAR+5DZyjdB1ZPZ7HBI=
-  file: "$TARGET.tar.gz"
+  file: "$TARGET.zip"
   on:
     repo: Axosoft/git-rs
     tags: true
