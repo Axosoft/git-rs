@@ -78,6 +78,21 @@ pub fn main() {
                 }),
         )
         .arg(
+            Arg::with_name("exec-path")
+                .short("e")
+                .long("exec-path")
+                .value_name("GIT_EXEC_PATH")
+                .help("Sets the location the Git libexec/git-core directory. Will take precedence over existing system Git executable.")
+                .takes_value(true)
+                .validator(|maybe_path| {
+                    if Path::new(&maybe_path).is_relative() {
+                        Err(String::from("Must be an absolute path to libexec/git-core directory!"))
+                    } else {
+                        Ok(())
+                    }
+                }),
+        )
+        .arg(
             Arg::with_name("debug")
                 .short("d")
                 .long("debug")
@@ -88,8 +103,11 @@ pub fn main() {
     {
         let mut config = config::CONFIG.write().unwrap();
         matches.value_of("git-path").map(|maybe_path| {
+            config.git_path = Some(String::from(maybe_path));
+        });
+        matches.value_of("exec-path").map(|maybe_path| {
             if Path::new(&maybe_path).is_dir() {
-                config.git_path = Some(String::from(maybe_path));
+                config.exec_path = Some(String::from(maybe_path));
             } else {
                 process::exit(constants::exit_code::ENOENT);
             }
