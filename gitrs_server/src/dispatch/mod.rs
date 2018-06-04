@@ -9,6 +9,7 @@ use semver::Version;
 use state;
 use std::sync::{Arc, Mutex};
 use tokio;
+use tokio_io::codec::length_delimited::Builder;
 use tokio::net::TcpStream;
 use util::transport::{read_message, send_message, Transport};
 
@@ -30,7 +31,10 @@ macro_rules! read_validated_message {
 
 pub fn init_dispatch(state: Arc<Mutex<state::Shared>>, socket: TcpStream) {
     use message::protocol::{Inbound, Outbound};
-    let transport = Transport::new(socket);
+    let transport: Transport = Builder::new()
+        // Frame header size + max size addressable size of unsigned 32 bit int
+        .max_frame_length(4 + (u32::max_value() as usize))
+        .new_framed(socket);
     let connection_state = state::Connection::new(state, transport);
 
     let connection = send_message(
