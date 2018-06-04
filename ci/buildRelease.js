@@ -52,21 +52,6 @@ const getFileChecksum = async (filePath) => new Promise((resolve) => {
   checksum.file(filePath, { algorithm: 'sha256' } , (_, hash) => resolve(hash));
 });
 
-const unpackFile = async (filePath, destinationPath) => tar.extract({
-  cwd: destinationPath,
-  file: filePath
-});
-
-const packBundle = async (context, sourcePaths, destinationFile) => tar.create(
-  {
-    cwd: context,
-    file: destinationFile,
-    gzip: true
-  },
-  sourcePaths
-);
-
-
 const bundleGit = ({
   buildDirectory,
   expectedChecksum,
@@ -107,19 +92,19 @@ const bundleGit = ({
 
     mkdirp.sync(vendorDirectoryPath);
 
-    fs.copyFile(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName), (error) => {
-      if (error) {
-        console.log(`Could not copy git-rs binaries`);
-        process.exit(1);
-      }
-    });
+    fs.copyFileSync(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName));
 
     try {
-      await unpackFile(tempFile, vendorDirectoryPath);
+      await tar.extract({
+        cwd: vendorDirectoryPath,
+        file: tempFile
+      });
     } catch (error) {
       console.log('Could not extract git archive');
       process.exit(1);
     }
+
+    fs.unlinkSync(path.join(tempFile));
 
     try {
       zip.zipSync(buildDirectory, `${process.env.TARGET}.zip`);
