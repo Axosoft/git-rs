@@ -28,11 +28,9 @@ pub fn new_command() -> Command {
 
     let mut command = Command::new("git");
     path.map(|path| {
-        println!("{}", &path);
         command.env("PATH", &String::from(path));
     });
     exec_path.map(|exec_path| {
-        println!("{}", &exec_path);
         command.env("GIT_EXEC_PATH", &String::from(exec_path));
     });
     command.arg("--no-pager");
