@@ -5,6 +5,7 @@ const path = require('path');
 const request = require('request');
 const tar = require('tar');
 const url = require('url');
+const zip = require('cross-zip');
 
 const config = {
   buildDirectory: '',
@@ -51,7 +52,7 @@ const getFileChecksum = async (filePath) => new Promise((resolve) => {
   checksum.file(filePath, { algorithm: 'sha256' } , (_, hash) => resolve(hash));
 });
 
-const unpackFile = async (filePath, destinationPath) => tar.extract({ 
+const unpackFile = async (filePath, destinationPath) => tar.extract({
   cwd: destinationPath,
   file: filePath
 });
@@ -77,12 +78,7 @@ const bundleGit = ({
   vendorDirectoryName,
   vendorDirectoryPath
 }) => {
-  mkdirp(buildDirectory, (error) => {
-    if (error) {
-      console.log(`Could not create build directory`);
-      process.exit(1);
-    }
-  });
+  mkdirp.sync(buildDirectory);
 
   const options = {
     url: source
@@ -109,12 +105,7 @@ const bundleGit = ({
       process.exit(1);
     }
 
-    mkdirp(vendorDirectoryPath, (error) => {
-      if (error) {
-        console.log(`Could not create ${vendor} directory to extract files to`);
-        process.exit(1);
-      }
-    });
+    mkdirp.sync(vendorDirectoryPath);
 
     fs.copyFile(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName), (error) => {
       if (error) {
@@ -131,7 +122,7 @@ const bundleGit = ({
     }
 
     try {
-      await packBundle(buildDirectory, [vendorDirectoryName, gitRsBinaryName], `${process.env.TARGET}.tar.gz`);
+      zip.zipSync(buildDirectory, `${process.env.TARGET}.zip`);
     } catch (error) {
       console.log('Could not build git-rs archive');
       console.error(error);

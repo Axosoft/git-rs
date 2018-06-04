@@ -31,12 +31,12 @@ build_script:
 before_deploy:
   - node .\ci\checkTomlSemver.js
   - node .\ci\buildRelease.js
-  - appveyor PushArtifact %TARGET%.tar.gz
+  - appveyor PushArtifact %TARGET%.zip
 
 deploy:
   provider: GitHub
   auth_token:
     secure: zoXq0OxJO1R1p6m0fU45j8SyEFaK9LRYYyVd+jazLtt/t58Racmu9ih1C/cjucy3
-  artifact: '%TARGET%.tar.gz'
+  artifact: '%TARGET%.zip'
   on:
     DO_DEPLOY: true
