@@ -1,5 +1,5 @@
 const checksum = require('checksum');
-const fs = require('fs');
+const fs = require('fs-extra');
 const mkdirp = require('mkdirp');
 const path = require('path');
 const request = require('request');
@@ -92,7 +92,7 @@ const bundleGit = ({
 
     mkdirp.sync(vendorDirectoryPath);
 
-    fs.copyFileSync(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName));
+    await fs.copy(gitRsBinaryPath, path.join(buildDirectory, gitRsBinaryName));
 
     try {
       await tar.extract({
@@ -104,14 +104,17 @@ const bundleGit = ({
       process.exit(1);
     }
 
-    fs.unlinkSync(path.join(tempFile));
+    await fs.remove(tempFile);
 
+
+    let zipSourceDir = buildDirectory;
     if (process.platform === 'win32') {
-      fs.renameSync(buildDirectory, path.join(buildDirectory, 'git-rs'));
+      let zipSourceDir = path.join(buildDirectory, 'git-rs');
+      await fs.copy(buildDirectory, zipSourceDir);
     }
 
     try {
-      zip.zipSync(buildDirectory, `${process.env.TARGET}.zip`);
+      zip.zipSync(zipSourceDir, `${process.env.TARGET}.zip`);
     } catch (error) {
       console.log('Could not build git-rs archive');
       console.error(error);
