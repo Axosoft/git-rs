@@ -1,6 +1,7 @@
 mod status_entry;
 
 use self::status_entry::{parse_git_status, StatusResult};
+use config;
 use futures::{future, Future};
 use state;
 use std::str;
@@ -41,6 +42,13 @@ pub fn dispatch(connection_state: state::Connection) -> DispatchFuture {
                     Err(_) => future::err((Error::Process(Failed), connection_state)),
                 })
                 .and_then(|(result, connection_state)| -> DispatchFuture {
+                    if result.len() == 0 {
+                        return Box::new(send_message(
+                            connection_state,
+                            OutboundMessage::Success { status: StatusResult::new() }
+                        ));
+                    }
+
                     match parse_git_status(&result) {
                         Ok(status) => Box::new(send_message(
                             connection_state,

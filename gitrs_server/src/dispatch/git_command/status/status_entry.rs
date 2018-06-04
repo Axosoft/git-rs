@@ -483,7 +483,7 @@ pub struct StatusResult {
 }
 
 impl StatusResult {
-    fn new() -> StatusResult {
+    pub fn new() -> StatusResult {
         Default::default()
     }
 }
