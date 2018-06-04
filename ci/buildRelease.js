@@ -106,6 +106,10 @@ const bundleGit = ({
 
     fs.unlinkSync(path.join(tempFile));
 
+    if (process.platform === 'win32') {
+      fs.renameSync(buildDirectory, path.join(buildDirectory, 'git-rs'));
+    }
+
     try {
       zip.zipSync(buildDirectory, `${process.env.TARGET}.zip`);
     } catch (error) {
