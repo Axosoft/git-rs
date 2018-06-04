@@ -43,7 +43,7 @@ switch (process.env.TARGET) {
     break;
 }
 
-config.buildDirectory = path.join(process.cwd(), 'build');
+config.buildDirectory = path.join(process.cwd(), 'git-rs');
 config.gitRsBinaryPath = path.join(process.cwd(), 'gitrs_server', 'target', 'release', config.gitRsBinaryName);
 config.vendorDirectoryPath = path.join(config.buildDirectory, config.vendorDirectoryName);
 config.tempFile = path.join(config.buildDirectory, 'git.tar.gz');
