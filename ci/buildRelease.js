@@ -109,8 +109,8 @@ const bundleGit = ({
 
     let zipSourceDir = buildDirectory;
     if (process.platform === 'win32') {
-      let zipSourceDir = path.join(buildDirectory, 'git-rs');
-      await fs.copy(buildDirectory, zipSourceDir);
+      let zipSourceDir = path.join(process.cwd(), 'temp-zip');
+      await fs.copy(buildDirectory, path.join(zipSourceDir, 'git-rs'));
     }
 
     try {
